@@ -1,13 +1,40 @@
 mod api_types;
 mod chat;
+mod embedding;
 mod error;
+mod image;
+mod speech;
 
 pub use chat::OpenAIChatModel;
+pub use embedding::OpenAIEmbeddingModel;
 pub use error::OpenAIError;
+pub use image::OpenAIImageModel;
+pub use speech::OpenAISpeechModel;
 
-// Factory function
+// Factory functions
 pub fn openai(model_id: impl Into<String>, api_key: impl Into<String>) -> OpenAIChatModel {
     OpenAIChatModel::new(model_id, api_key)
+}
+
+pub fn openai_embedding(
+    model_id: impl Into<String>,
+    api_key: impl Into<String>,
+) -> OpenAIEmbeddingModel {
+    OpenAIEmbeddingModel::new(model_id, api_key)
+}
+
+pub fn openai_image(
+    model_id: impl Into<String>,
+    api_key: impl Into<String>,
+) -> OpenAIImageModel {
+    OpenAIImageModel::new(model_id, api_key)
+}
+
+pub fn openai_speech(
+    model_id: impl Into<String>,
+    api_key: impl Into<String>,
+) -> OpenAISpeechModel {
+    OpenAISpeechModel::new(model_id, api_key)
 }
 
 #[cfg(test)]

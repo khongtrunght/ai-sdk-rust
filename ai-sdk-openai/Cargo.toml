@@ -17,7 +17,16 @@ async-stream = { workspace = true }
 futures = { workspace = true }
 reqwest = { workspace = true }
 thiserror = { workspace = true }
+base64 = "0.21"
 
 [[example]]
 name = "openai_basic"
 path = "examples/openai_basic.rs"
+
+[[example]]
+name = "embedding_basic"
+path = "examples/embedding_basic.rs"
+
+[[example]]
+name = "image_basic"
+path = "examples/image_basic.rs"
