@@ -1,0 +1,23 @@
+[package]
+name = "ai-sdk-openai"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "OpenAI provider for AI SDK (Rust)"
+
+[dependencies]
+ai-sdk-provider = { path = "../ai-sdk-provider" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+async-stream = { workspace = true }
+futures = { workspace = true }
+reqwest = { workspace = true }
+thiserror = { workspace = true }
+
+[[example]]
+name = "openai_basic"
+path = "examples/openai_basic.rs"
