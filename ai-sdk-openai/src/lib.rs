@@ -4,12 +4,14 @@ mod embedding;
 mod error;
 mod image;
 mod speech;
+mod transcription;
 
 pub use chat::OpenAIChatModel;
 pub use embedding::OpenAIEmbeddingModel;
 pub use error::OpenAIError;
 pub use image::OpenAIImageModel;
 pub use speech::OpenAISpeechModel;
+pub use transcription::OpenAITranscriptionModel;
 
 // Factory functions
 pub fn openai(model_id: impl Into<String>, api_key: impl Into<String>) -> OpenAIChatModel {
@@ -35,6 +37,13 @@ pub fn openai_speech(
     api_key: impl Into<String>,
 ) -> OpenAISpeechModel {
     OpenAISpeechModel::new(model_id, api_key)
+}
+
+pub fn openai_transcription(
+    model_id: impl Into<String>,
+    api_key: impl Into<String>,
+) -> OpenAITranscriptionModel {
+    OpenAITranscriptionModel::new(model_id, api_key)
 }
 
 #[cfg(test)]

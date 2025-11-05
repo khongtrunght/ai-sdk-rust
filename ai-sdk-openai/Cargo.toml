@@ -30,3 +30,7 @@ path = "examples/embedding_basic.rs"
 [[example]]
 name = "image_basic"
 path = "examples/image_basic.rs"
+
+[[example]]
+name = "transcription_basic"
+path = "examples/transcription_basic.rs"
