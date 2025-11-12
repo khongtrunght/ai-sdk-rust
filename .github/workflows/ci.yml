@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, dev]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  lints:
+    name: Rustfmt & Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rustfmt
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+
+  check:
+    name: cargo-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Check
+        run: cargo check --all-features --all-targets
+
+  test:
+    name: cargo-test
+    needs: lints
+    strategy:
+      fail-fast: false # Show all failures
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust: [stable, beta]
+        exclude:
+          # Only test beta on Ubuntu to save CI time
+          - os: macos-latest
+            rust: beta
+          - os: windows-latest
+            rust: beta
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}-${{ matrix.rust }}
+
+      - name: Build
+        run: cargo build --workspace --all-features --verbose
+
+      - name: Run tests
+        run: cargo +nightly test --workspace --all-features --verbose
+        # Note: Tests with #[ignore] are skipped automatically
+
+  # Status check for branch protection
+  ci-success:
+    name: CI Success
+    needs: [lints, check, test]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs succeeded
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

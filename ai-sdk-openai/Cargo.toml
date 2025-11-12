@@ -4,7 +4,16 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "OpenAI provider for AI SDK (Rust)"
+rust-version.workspace = true
+description = "OpenAI provider for AI SDK - GPT, DALL-E, Whisper, and Embeddings"
+documentation = "https://docs.rs/ai-sdk-openai"
+readme = "../README.md"
+keywords = ["openai", "gpt", "dalle", "whisper", "embeddings"]
+categories = ["api-bindings", "asynchronous", "web-programming"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 ai-sdk-provider = { path = "../ai-sdk-provider" }

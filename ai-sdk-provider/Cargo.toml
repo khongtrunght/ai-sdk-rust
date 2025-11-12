@@ -4,7 +4,16 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Provider specification for AI SDK (Rust)"
+rust-version.workspace = true
+description = "Provider specification for AI SDK - trait-based interfaces for AI models"
+documentation = "https://docs.rs/ai-sdk-provider"
+readme = "README.md"
+keywords = ["ai", "llm", "provider", "api", "sdk"]
+categories = ["api-bindings", "asynchronous", "web-programming"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 serde = { workspace = true }

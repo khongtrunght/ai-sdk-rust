@@ -1,7 +1,45 @@
-//! AI SDK Provider Specification (v3)
+//! # AI SDK Provider Specification (v3)
 //!
-//! This crate defines the provider interface specification that
-//! all AI model providers must implement.
+//! This crate defines the provider interface specification that all AI model
+//! providers must implement. It provides trait-based interfaces for different
+//! types of AI models.
+//!
+//! ## Features
+//!
+//! - **Language Models** - Text generation and chat completion
+//! - **Embedding Models** - Text embedding generation
+//! - **Image Models** - Image generation
+//! - **Speech Models** - Text-to-speech synthesis
+//! - **Transcription Models** - Speech-to-text transcription
+//! - **Reranking Models** - Document reranking by relevance
+//!
+//! ## Example
+//!
+//! ```rust,no_run
+//! use ai_sdk_provider::{LanguageModel, CallOptions};
+//!
+//! async fn generate_text<M: LanguageModel>(model: &M) {
+//!     let options = CallOptions {
+//!         // ... configure options
+//!         ..Default::default()
+//!     };
+//!
+//!     let response = model.do_generate(options).await.unwrap();
+//!     println!("Generated: {}", response.text);
+//! }
+//! ```
+//!
+//! ## Provider Implementations
+//!
+//! Provider implementations are maintained in separate crates:
+//!
+//! - [`ai-sdk-openai`] - OpenAI provider
+//!
+//! [`ai-sdk-openai`]: https://crates.io/crates/ai-sdk-openai
+
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![warn(missing_docs)]
+#![warn(rustdoc::broken_intra_doc_links)]
 
 pub mod embedding_model;
 pub mod image_model;
