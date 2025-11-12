@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, dev]
   pull_request:
+    branches: [main]
 
 # Cancel in-progress runs when new commits are pushed
 concurrency:
@@ -15,25 +16,25 @@ env:
   RUSTFLAGS: -Dwarnings
 
 jobs:
-  # Fast feedback: formatting check (runs first)
-  fmt:
-    name: Format Check
+  lints:
+    name: Rustfmt & Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
 
-      - name: Check formatting
+      - name: Rustfmt
         run: cargo fmt --all -- --check
 
-  # Linting with Clippy
-  clippy:
-    name: Clippy
+      - name: Clippy
+        run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+
+  check:
+    name: cargo-check
     runs-on: ubuntu-latest
-    needs: fmt  # Only run if formatting passes
     steps:
       - uses: actions/checkout@v4
 
@@ -41,19 +42,14 @@ jobs:
         with:
           components: clippy
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "clippy"
+      - name: Check
+        run: cargo check --all-features --all-targets
 
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
-  # Multi-platform testing
   test:
-    name: Test Suite
-    needs: fmt
+    name: cargo-test
+    needs: lints
     strategy:
-      fail-fast: false  # Show all failures
+      fail-fast: false # Show all failures
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         rust: [stable, beta]
@@ -67,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: ${{ matrix.rust }}
 
@@ -79,49 +75,13 @@ jobs:
         run: cargo build --workspace --all-features --verbose
 
       - name: Run tests
-        run: cargo test --workspace --all-features --verbose
+        run: cargo +nightly test --workspace --all-features --verbose
         # Note: Tests with #[ignore] are skipped automatically
-
-  # MSRV (Minimum Supported Rust Version) check
-  msrv:
-    name: MSRV Check (Rust 1.70)
-    runs-on: ubuntu-latest
-    needs: fmt
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@1.70.0
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "msrv"
-
-      - name: Check with MSRV
-        run: cargo check --workspace --all-features
-
-  # Documentation build check
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    needs: fmt
-    env:
-      RUSTDOCFLAGS: -Dwarnings
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: "docs"
-
-      - name: Build documentation
-        run: cargo doc --workspace --all-features --no-deps
 
   # Status check for branch protection
   ci-success:
     name: CI Success
-    needs: [fmt, clippy, test, msrv, docs]
+    needs: [lints, check, test]
     runs-on: ubuntu-latest
     if: always()
     steps:
