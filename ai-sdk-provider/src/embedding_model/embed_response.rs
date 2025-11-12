@@ -1,5 +1,5 @@
-use crate::SharedProviderMetadata;
 use crate::SharedHeaders;
+use crate::SharedProviderMetadata;
 use serde::{Deserialize, Serialize};
 
 /// An embedding is a vector, i.e. an array of numbers.

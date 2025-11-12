@@ -29,6 +29,7 @@ pub enum ImageData {
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageProviderMetadata {
+    /// Provider-specific metadata keyed by provider name
     #[serde(flatten)]
     pub metadata: HashMap<String, JsonObject>,
 }

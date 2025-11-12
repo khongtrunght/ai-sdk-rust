@@ -14,24 +14,26 @@
 //!
 //! ## Example
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use ai_sdk_openai::OpenAIChatModel;
-//! use ai_sdk_provider::{LanguageModel, CallOptions, Message};
+//! use ai_sdk_provider::{LanguageModel, CallOptions, Message, UserContentPart};
 //!
 //! #[tokio::main]
-//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let api_key = std::env::var("OPENAI_API_KEY")?;
+//! async fn main() {
+//!     let api_key = std::env::var("OPENAI_API_KEY").unwrap();
 //!     let model = OpenAIChatModel::new("gpt-4", api_key);
 //!
 //!     let options = CallOptions {
-//!         messages: vec![Message::user("Hello!")],
+//!         prompt: vec![Message::User {
+//!             content: vec![UserContentPart::Text {
+//!                 text: "Hello!".to_string(),
+//!             }],
+//!         }],
 //!         ..Default::default()
 //!     };
 //!
-//!     let response = model.do_generate(options).await?;
+//!     let response = model.do_generate(options).await.unwrap();
 //!     println!("{}", response.text);
-//!
-//!     Ok(())
 //! }
 //! ```
 //!
@@ -58,10 +60,13 @@ pub use speech::OpenAISpeechModel;
 pub use transcription::OpenAITranscriptionModel;
 
 // Factory functions
+
+/// Creates a new OpenAI chat model with the specified model ID and API key.
 pub fn openai(model_id: impl Into<String>, api_key: impl Into<String>) -> OpenAIChatModel {
     OpenAIChatModel::new(model_id, api_key)
 }
 
+/// Creates a new OpenAI embedding model with the specified model ID and API key.
 pub fn openai_embedding(
     model_id: impl Into<String>,
     api_key: impl Into<String>,
@@ -69,20 +74,17 @@ pub fn openai_embedding(
     OpenAIEmbeddingModel::new(model_id, api_key)
 }
 
-pub fn openai_image(
-    model_id: impl Into<String>,
-    api_key: impl Into<String>,
-) -> OpenAIImageModel {
+/// Creates a new OpenAI image model with the specified model ID and API key.
+pub fn openai_image(model_id: impl Into<String>, api_key: impl Into<String>) -> OpenAIImageModel {
     OpenAIImageModel::new(model_id, api_key)
 }
 
-pub fn openai_speech(
-    model_id: impl Into<String>,
-    api_key: impl Into<String>,
-) -> OpenAISpeechModel {
+/// Creates a new OpenAI speech model with the specified model ID and API key.
+pub fn openai_speech(model_id: impl Into<String>, api_key: impl Into<String>) -> OpenAISpeechModel {
     OpenAISpeechModel::new(model_id, api_key)
 }
 
+/// Creates a new OpenAI transcription model with the specified model ID and API key.
 pub fn openai_transcription(
     model_id: impl Into<String>,
     api_key: impl Into<String>,

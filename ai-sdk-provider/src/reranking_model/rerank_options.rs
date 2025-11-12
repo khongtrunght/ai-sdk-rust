@@ -5,9 +5,15 @@ use crate::shared::{SharedHeaders, SharedProviderOptions};
 #[derive(Debug, Clone)]
 pub enum Documents {
     /// A list of text documents
-    Text { values: Vec<String> },
+    Text {
+        /// Text document strings
+        values: Vec<String>,
+    },
     /// A list of JSON object documents
-    Object { values: Vec<JsonObject> },
+    Object {
+        /// JSON object documents
+        values: Vec<JsonObject>,
+    },
 }
 
 /// Options for reranking documents

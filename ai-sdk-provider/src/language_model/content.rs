@@ -5,11 +5,17 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum Content {
+    /// Text content part
     Text(TextPart),
+    /// Reasoning content part (for reasoning models like o1)
     Reasoning(ReasoningPart),
+    /// File content part (images, audio, etc.)
     File(FilePart),
+    /// Source citation content part
     Source(SourcePart),
+    /// Tool call content part
     ToolCall(ToolCallPart),
+    /// Tool result content part
     ToolResult(ToolResultPart),
 }
 
@@ -19,6 +25,7 @@ pub struct TextPart {
     /// The text content
     pub text: String,
 
+    /// Provider-specific metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_metadata: Option<SharedProviderMetadata>,
 }
@@ -29,6 +36,7 @@ pub struct ReasoningPart {
     /// The reasoning text
     pub reasoning: String,
 
+    /// Provider-specific metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_metadata: Option<SharedProviderMetadata>,
 }
@@ -43,6 +51,7 @@ pub struct FilePart {
     /// MIME type (e.g., "image/jpeg")
     pub media_type: String,
 
+    /// Provider-specific metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_metadata: Option<SharedProviderMetadata>,
 }
@@ -51,23 +60,31 @@ pub struct FilePart {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourcePart {
+    /// The type of source
     pub source_type: SourceType,
+    /// Unique identifier for the source
     pub id: String,
 
+    /// URL of the source
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 
+    /// Title of the source
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
 
+    /// Provider-specific metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_metadata: Option<SharedProviderMetadata>,
 }
 
+/// Type of source citation
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SourceType {
+    /// URL-based source
     Url,
+    /// Document-based source
     Document,
 }
 
@@ -75,17 +92,22 @@ pub enum SourceType {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolCallPart {
+    /// Unique identifier for the tool call
     pub tool_call_id: String,
+    /// Name of the tool being called
     pub tool_name: String,
     /// Stringified JSON with tool arguments
     pub input: String,
 
+    /// Whether the tool was executed by the provider
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_executed: Option<bool>,
 
+    /// Whether the tool call is dynamic
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dynamic: Option<bool>,
 
+    /// Provider-specific metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_metadata: Option<SharedProviderMetadata>,
 }
@@ -94,15 +116,20 @@ pub struct ToolCallPart {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolResultPart {
+    /// Identifier of the tool call this result is for
     pub tool_call_id: String,
+    /// Result data from the tool execution
     pub result: JsonValue,
 
+    /// Whether the result represents an error
     #[serde(default, skip_serializing_if = "is_false")]
     pub is_error: bool,
 
+    /// Whether the result is preliminary
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preliminary: Option<bool>,
 
+    /// Provider-specific metadata
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_metadata: Option<SharedProviderMetadata>,
 }

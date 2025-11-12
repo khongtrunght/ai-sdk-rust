@@ -4,6 +4,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// OpenAI implementation of image model.
 pub struct OpenAIImageModel {
     model_id: String,
     api_key: String,
@@ -12,6 +13,7 @@ pub struct OpenAIImageModel {
 }
 
 impl OpenAIImageModel {
+    /// Creates a new image model with the specified model ID and API key.
     pub fn new(model_id: impl Into<String>, api_key: impl Into<String>) -> Self {
         Self {
             model_id: model_id.into(),
@@ -23,10 +25,7 @@ impl OpenAIImageModel {
 
     /// Check if this model has a default response format
     fn has_default_response_format(&self) -> bool {
-        matches!(
-            self.model_id.as_str(),
-            "gpt-image-1" | "gpt-image-1-mini"
-        )
+        matches!(self.model_id.as_str(), "gpt-image-1" | "gpt-image-1-mini")
     }
 }
 

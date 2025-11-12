@@ -19,10 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let response = model.do_embed(options).await?;
 
     println!("Generated {} embeddings", response.embeddings.len());
-    println!(
-        "Embedding dimension: {}",
-        response.embeddings[0].len()
-    );
+    println!("Embedding dimension: {}", response.embeddings[0].len());
 
     if let Some(usage) = &response.usage {
         println!("Tokens used: {}", usage.tokens);
@@ -30,7 +27,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Calculate similarity between the two embeddings
     let similarity = cosine_similarity(&response.embeddings[0], &response.embeddings[1]);
-    println!("\nCosine similarity between the two texts: {:.4}", similarity);
+    println!(
+        "\nCosine similarity between the two texts: {:.4}",
+        similarity
+    );
     println!("(Values closer to 1.0 indicate more similar texts)");
 
     Ok(())

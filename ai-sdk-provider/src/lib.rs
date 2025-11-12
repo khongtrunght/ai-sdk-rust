@@ -15,17 +15,21 @@
 //!
 //! ## Example
 //!
-//! ```rust,no_run
-//! use ai_sdk_provider::{LanguageModel, CallOptions};
+//! ```rust,ignore
+//! use ai_sdk_provider::{LanguageModel, CallOptions, Message, UserContentPart};
 //!
 //! async fn generate_text<M: LanguageModel>(model: &M) {
 //!     let options = CallOptions {
-//!         // ... configure options
+//!         prompt: vec![Message::User {
+//!             content: vec![UserContentPart::Text {
+//!                 text: "Hello!".to_string(),
+//!             }],
+//!         }],
 //!         ..Default::default()
 //!     };
 //!
 //!     let response = model.do_generate(options).await.unwrap();
-//!     println!("Generated: {}", response.text);
+//!     println!("Generated: {:?}", response.content);
 //! }
 //! ```
 //!
@@ -41,13 +45,21 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 
+/// Embedding model interfaces and types for text embedding generation.
 pub mod embedding_model;
+/// Image model interfaces and types for image generation.
 pub mod image_model;
+/// JSON value types for provider metadata and structured data.
 pub mod json_value;
+/// Language model interfaces and types for text generation and chat completion.
 pub mod language_model;
+/// Reranking model interfaces and types for document reranking.
 pub mod reranking_model;
+/// Shared types and utilities used across all model types.
 pub mod shared;
+/// Speech model interfaces and types for text-to-speech synthesis.
 pub mod speech_model;
+/// Transcription model interfaces and types for speech-to-text transcription.
 pub mod transcription_model;
 
 // Re-export commonly used types

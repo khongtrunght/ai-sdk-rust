@@ -17,15 +17,15 @@ async fn test_openai_embedding() {
     let response = model.do_embed(options).await.unwrap();
 
     assert_eq!(response.embeddings.len(), 2);
-    assert!(response.embeddings[0].len() > 0);
+    assert!(!response.embeddings[0].is_empty());
     assert!(response.usage.is_some());
 }
 
 #[tokio::test]
 #[ignore] // Requires API key
 async fn test_openai_embedding_with_dimensions() {
-    use std::collections::HashMap;
     use ai_sdk_provider::JsonValue;
+    use std::collections::HashMap;
 
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 

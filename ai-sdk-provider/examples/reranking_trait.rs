@@ -1,6 +1,4 @@
-use ai_sdk_provider::{
-    Documents, RankingItem, RerankOptions, RerankResponse, RerankingModel,
-};
+use ai_sdk_provider::{Documents, RankingItem, RerankOptions, RerankResponse, RerankingModel};
 use async_trait::async_trait;
 
 // Example dummy implementation for testing

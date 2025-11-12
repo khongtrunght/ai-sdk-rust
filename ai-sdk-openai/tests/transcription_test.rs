@@ -23,7 +23,10 @@ async fn test_openai_transcription_with_binary_audio() {
 
     let response = model.do_generate(options).await.unwrap();
 
-    assert!(!response.text.is_empty(), "Transcription text should not be empty");
+    assert!(
+        !response.text.is_empty(),
+        "Transcription text should not be empty"
+    );
     println!("Transcribed text: {}", response.text);
 
     if !response.segments.is_empty() {
@@ -34,7 +37,11 @@ async fn test_openai_transcription_with_binary_audio() {
 
     if let Some(lang) = &response.language {
         println!("Detected language: {}", lang);
-        assert_eq!(lang.len(), 2, "Language code should be ISO-639-1 (2 characters)");
+        assert_eq!(
+            lang.len(),
+            2,
+            "Language code should be ISO-639-1 (2 characters)"
+        );
     }
 
     if let Some(duration) = response.duration_in_seconds {

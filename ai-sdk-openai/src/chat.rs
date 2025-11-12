@@ -6,6 +6,7 @@ use futures::stream::StreamExt;
 use reqwest::Client;
 use std::collections::HashMap;
 
+/// OpenAI implementation of chat model.
 pub struct OpenAIChatModel {
     model_id: String,
     api_key: String,
@@ -14,6 +15,7 @@ pub struct OpenAIChatModel {
 }
 
 impl OpenAIChatModel {
+    /// Creates a new chat model with the specified model ID and API key.
     pub fn new(model_id: impl Into<String>, api_key: impl Into<String>) -> Self {
         Self {
             model_id: model_id.into(),

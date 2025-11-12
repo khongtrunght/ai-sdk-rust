@@ -4,8 +4,8 @@ use ai_sdk_provider::{AudioInput, TranscriptionModel, TranscriptionOptions};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get API key from environment
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .expect("OPENAI_API_KEY environment variable must be set");
+    let api_key =
+        std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable must be set");
 
     // Create the model
     let model = OpenAITranscriptionModel::new("whisper-1", api_key);

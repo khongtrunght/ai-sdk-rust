@@ -5,6 +5,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::time::SystemTime;
 
+/// OpenAI implementation of transcription model.
 pub struct OpenAITranscriptionModel {
     model_id: String,
     api_key: String,
@@ -13,6 +14,7 @@ pub struct OpenAITranscriptionModel {
 }
 
 impl OpenAITranscriptionModel {
+    /// Creates a new transcription model with the specified model ID and API key.
     pub fn new(model_id: impl Into<String>, api_key: impl Into<String>) -> Self {
         Self {
             model_id: model_id.into(),

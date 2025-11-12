@@ -6,11 +6,17 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum JsonValue {
+    /// JSON null value
     Null,
+    /// JSON boolean value
     Bool(bool),
+    /// JSON number value
     Number(serde_json::Number),
+    /// JSON string value
     String(String),
+    /// JSON array value
     Array(Vec<JsonValue>),
+    /// JSON object value
     Object(JsonObject),
 }
 

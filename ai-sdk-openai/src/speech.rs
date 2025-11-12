@@ -5,6 +5,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::time::SystemTime;
 
+/// OpenAI implementation of speech model.
 pub struct OpenAISpeechModel {
     model_id: String,
     api_key: String,
@@ -13,6 +14,7 @@ pub struct OpenAISpeechModel {
 }
 
 impl OpenAISpeechModel {
+    /// Creates a new speech model with the specified model ID and API key.
     pub fn new(model_id: impl Into<String>, api_key: impl Into<String>) -> Self {
         Self {
             model_id: model_id.into(),

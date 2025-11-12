@@ -43,38 +43,58 @@ pub trait LanguageModel: Send + Sync {
 /// Response from do_generate
 #[derive(Debug, Clone)]
 pub struct GenerateResponse {
+    /// Generated content parts
     pub content: Vec<Content>,
+    /// Reason why generation finished
     pub finish_reason: FinishReason,
+    /// Token usage information
     pub usage: Usage,
+    /// Provider-specific metadata
     pub provider_metadata: Option<SharedProviderMetadata>,
+    /// Information about the request
     pub request: Option<RequestInfo>,
+    /// Information about the response
     pub response: Option<ResponseInfo>,
+    /// Warnings about the call
     pub warnings: Vec<CallWarning>,
 }
 
 /// Response from do_stream
 pub struct StreamResponse {
+    /// Stream of response parts
     pub stream: std::pin::Pin<Box<dyn Stream<Item = Result<StreamPart, StreamError>> + Send>>,
+    /// Information about the request
     pub request: Option<RequestInfo>,
+    /// Information about the response
     pub response: Option<ResponseInfo>,
 }
 
+/// Information about the request sent to the provider
 #[derive(Debug, Clone)]
 pub struct RequestInfo {
+    /// Request body sent to the provider
     pub body: Option<serde_json::Value>,
 }
 
+/// Information about the response from the provider
 #[derive(Debug, Clone)]
 pub struct ResponseInfo {
+    /// Response headers from the provider
     pub headers: Option<SharedHeaders>,
+    /// Response body from the provider
     pub body: Option<serde_json::Value>,
+    /// Provider's response ID
     pub id: Option<String>,
+    /// Response timestamp
     pub timestamp: Option<String>,
+    /// Actual model used (may differ from requested)
     pub model_id: Option<String>,
 }
 
+/// Error during streaming
 #[derive(Debug, thiserror::Error)]
 pub enum StreamError {
+    /// Other streaming error
     #[error("Stream error: {0}")]
     Other(String),
 }

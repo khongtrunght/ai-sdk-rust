@@ -1,14 +1,24 @@
 //! Language Model v3 specification types
 
+/// Call options for language model generation
 pub mod call_options;
+/// Content types for language model messages
 pub mod content;
+/// Data content types for binary data in messages
 pub mod data_content;
+/// Finish reason enumeration for generation completion
 pub mod finish_reason;
+/// Prompt and message types for language model input
 pub mod prompt;
+/// Response metadata for debugging and telemetry
 pub mod response_metadata;
+/// Streaming types for language model generation
 pub mod stream;
+/// Tool calling types for function calling
 pub mod tools;
+/// Language model trait definition
 pub mod trait_def;
+/// Token usage statistics
 pub mod usage;
 
 pub use call_options::{CallOptions, ResponseFormat};

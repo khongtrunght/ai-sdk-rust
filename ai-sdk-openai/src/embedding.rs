@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+/// OpenAI implementation of embedding model.
 pub struct OpenAIEmbeddingModel {
     model_id: String,
     api_key: String,
@@ -11,6 +12,7 @@ pub struct OpenAIEmbeddingModel {
 }
 
 impl OpenAIEmbeddingModel {
+    /// Creates a new embedding model with the specified model ID and API key.
     pub fn new(model_id: impl Into<String>, api_key: impl Into<String>) -> Self {
         Self {
             model_id: model_id.into(),
@@ -145,11 +147,7 @@ impl EmbeddingModel<String> for OpenAIEmbeddingModel {
         let api_response: EmbeddingApiResponse = serde_json::from_str(&response_body)?;
 
         Ok(EmbedResponse {
-            embeddings: api_response
-                .data
-                .into_iter()
-                .map(|d| d.embedding)
-                .collect(),
+            embeddings: api_response.data.into_iter().map(|d| d.embedding).collect(),
             usage: api_response.usage.map(|u| EmbeddingUsage {
                 tokens: u.prompt_tokens,
             }),

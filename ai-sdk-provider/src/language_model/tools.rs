@@ -6,24 +6,34 @@ use serde_json::Value as JsonSchema;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum ToolChoice {
+    /// Model chooses whether to call tools
     Auto,
+    /// Model does not call tools
     None,
+    /// Model must call at least one tool
     Required,
-    Tool { tool_name: String },
+    /// Model must call a specific tool
+    Tool {
+        /// Name of the tool to call
+        tool_name: String,
+    },
 }
 
 /// Function tool definition
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FunctionTool {
+    /// Name of the tool
     pub name: String,
 
+    /// Description of what the tool does
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
     /// JSON Schema defining the tool's input parameters
     pub input_schema: JsonSchema,
 
+    /// Provider-specific options for the tool
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider_options: Option<SharedProviderOptions>,
 }
@@ -33,7 +43,9 @@ pub struct FunctionTool {
 pub struct ProviderDefinedTool {
     /// Must match pattern: `provider.tool-name`
     pub id: String,
+    /// Human-readable name of the tool
     pub name: String,
+    /// Arguments for the provider-defined tool
     pub args: serde_json::Map<String, serde_json::Value>,
 }
 
@@ -41,7 +53,9 @@ pub struct ProviderDefinedTool {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum Tool {
+    /// A function tool defined by the application
     Function(FunctionTool),
+    /// A tool defined by the provider
     ProviderDefined(ProviderDefinedTool),
 }
 
