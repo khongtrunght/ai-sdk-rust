@@ -4,6 +4,7 @@
 [![Documentation](https://docs.rs/ai-sdk-provider/badge.svg)](https://docs.rs/ai-sdk-provider)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 [![CI](https://github.com/khongtrunght/ai-sdk-rust/workflows/CI/badge.svg)](https://github.com/khongtrunght/ai-sdk-rust/actions)
+[![Security Audit](https://github.com/khongtrunght/ai-sdk-rust/workflows/Security%20Audit/badge.svg)](https://github.com/khongtrunght/ai-sdk-rust/actions)
 [![Rust Version](https://img.shields.io/badge/rust-1.70%2B-blue.svg)](https://www.rust-lang.org)
 
 Rust implementation of the AI SDK, providing a unified interface for interacting with various AI model providers.
