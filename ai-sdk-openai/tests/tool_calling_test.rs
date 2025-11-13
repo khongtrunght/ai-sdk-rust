@@ -1,8 +1,8 @@
 use ai_sdk_openai::OpenAIChatModel;
 use ai_sdk_provider::language_model::{
-    FunctionTool, Tool, ToolChoice, UserContentPart,
+    FunctionTool, Message, Tool, ToolChoice, UserContentPart,
 };
-use ai_sdk_provider::{CallOptions, Content, FinishReason, LanguageModel, Message, StreamPart};
+use ai_sdk_provider::{CallOptions, Content, FinishReason, LanguageModel, StreamPart};
 use futures::stream::StreamExt;
 
 #[tokio::test]
