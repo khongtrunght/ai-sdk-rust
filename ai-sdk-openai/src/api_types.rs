@@ -15,6 +15,39 @@ pub struct ChatCompletionRequest {
     pub tools: Option<Vec<OpenAITool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<OpenAIToolChoice>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<OpenAIResponseFormat>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_options: Option<StreamOptions>,
+}
+
+/// Options for streaming responses
+#[derive(Debug, Serialize, Clone)]
+pub struct StreamOptions {
+    pub include_usage: bool,
+}
+
+/// Response format for OpenAI API
+#[derive(Debug, Serialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum OpenAIResponseFormat {
+    /// Text response (default)
+    Text,
+    /// JSON object response (unvalidated)
+    JsonObject,
+    /// JSON schema response (structured)
+    JsonSchema { json_schema: OpenAIJsonSchema },
+}
+
+/// JSON schema for structured outputs
+#[derive(Debug, Serialize, Clone)]
+pub struct OpenAIJsonSchema {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub schema: JsonValue,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strict: Option<bool>,
 }
 
 /// Content for a chat message - can be string or array of content parts
@@ -79,6 +112,7 @@ pub struct ChatCompletionChunk {
     #[allow(dead_code)]
     pub model: String,
     pub choices: Vec<StreamChoice>,
+    pub usage: Option<UsageInfo>,
 }
 
 #[derive(Debug, Deserialize)]

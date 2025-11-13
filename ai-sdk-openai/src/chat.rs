@@ -227,6 +227,35 @@ impl OpenAIChatModel {
         }
     }
 
+    fn convert_response_format(
+        &self,
+        response_format: &language_model::ResponseFormat,
+    ) -> crate::api_types::OpenAIResponseFormat {
+        match response_format {
+            language_model::ResponseFormat::Text => crate::api_types::OpenAIResponseFormat::Text,
+            language_model::ResponseFormat::Json {
+                schema,
+                name,
+                description,
+            } => {
+                if let Some(schema) = schema {
+                    // Structured output with JSON schema
+                    crate::api_types::OpenAIResponseFormat::JsonSchema {
+                        json_schema: crate::api_types::OpenAIJsonSchema {
+                            name: name.clone().unwrap_or_else(|| "response".to_string()),
+                            description: description.clone(),
+                            schema: schema.clone(),
+                            strict: Some(true), // Enable strict mode for better validation
+                        },
+                    }
+                } else {
+                    // Unvalidated JSON mode
+                    crate::api_types::OpenAIResponseFormat::JsonObject
+                }
+            }
+        }
+    }
+
     fn map_finish_reason(&self, reason: Option<&str>) -> FinishReason {
         match reason {
             Some("stop") => FinishReason::Stop,
@@ -269,6 +298,11 @@ impl LanguageModel for OpenAIChatModel {
                 .tool_choice
                 .as_ref()
                 .map(|tc| self.convert_tool_choice(tc)),
+            response_format: options
+                .response_format
+                .as_ref()
+                .map(|rf| self.convert_response_format(rf)),
+            stream_options: None, // Not needed for non-streaming
         };
 
         let response = self
@@ -381,6 +415,13 @@ impl LanguageModel for OpenAIChatModel {
                 .tool_choice
                 .as_ref()
                 .map(|tc| self.convert_tool_choice(tc)),
+            response_format: options
+                .response_format
+                .as_ref()
+                .map(|rf| self.convert_response_format(rf)),
+            stream_options: Some(crate::api_types::StreamOptions {
+                include_usage: true,
+            }),
         };
 
         let response = self
@@ -404,6 +445,8 @@ impl LanguageModel for OpenAIChatModel {
             let mut byte_stream = response.bytes_stream();
             let mut buffer = String::new();
             let mut tool_calls: Vec<crate::api_types::OpenAIToolCall> = Vec::new();
+            let mut accumulated_usage: Option<Usage> = None;
+            let mut last_finish_reason: Option<FinishReason> = None;
 
             while let Some(chunk_result) = byte_stream.next().await {
                 match chunk_result {
@@ -422,6 +465,17 @@ impl LanguageModel for OpenAIChatModel {
 
                                 // Parse JSON chunk and convert to StreamPart
                                 if let Ok(chunk) = serde_json::from_str::<crate::api_types::ChatCompletionChunk>(data) {
+                                    // Capture usage if present
+                                    if let Some(usage_info) = &chunk.usage {
+                                        accumulated_usage = Some(Usage {
+                                            input_tokens: Some(usage_info.prompt_tokens),
+                                            output_tokens: Some(usage_info.completion_tokens),
+                                            total_tokens: Some(usage_info.total_tokens),
+                                            reasoning_tokens: None,
+                                            cached_input_tokens: None,
+                                        });
+                                    }
+
                                     // Convert OpenAI chunk to our StreamPart
                                     if let Some(choice) = chunk.choices.first() {
                                         // Handle text content
@@ -504,11 +558,10 @@ impl LanguageModel for OpenAIChatModel {
                                                     "tool_calls" => FinishReason::ToolCalls,
                                                     _ => FinishReason::Unknown,
                                                 };
-                                                yield Ok(StreamPart::Finish {
-                                                    usage: Usage::default(),
-                                                    finish_reason: mapped_reason,
-                                                    provider_metadata: None,
-                                                });
+
+                                                // Store the finish reason but don't emit Finish yet
+                                                // OpenAI may send usage in a subsequent chunk
+                                                last_finish_reason = Some(mapped_reason);
                                             }
                                         }
                                     }
@@ -521,6 +574,17 @@ impl LanguageModel for OpenAIChatModel {
                         break;
                     }
                 }
+            }
+
+            // Emit Finish event with accumulated usage
+            // OpenAI sends usage in a separate chunk after finish_reason when stream_options.include_usage is true
+            if let Some(finish_reason) = last_finish_reason {
+                let usage_to_send = accumulated_usage.unwrap_or_default();
+                yield Ok(StreamPart::Finish {
+                    usage: usage_to_send,
+                    finish_reason,
+                    provider_metadata: None,
+                });
             }
         };
 
