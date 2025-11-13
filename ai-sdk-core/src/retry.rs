@@ -4,8 +4,11 @@ use std::time::Duration;
 /// Retry policy for API calls
 #[derive(Clone)]
 pub struct RetryPolicy {
+    /// Maximum number of retry attempts
     pub max_retries: u32,
+    /// Initial delay before first retry
     pub initial_delay: Duration,
+    /// Maximum delay between retries
     pub max_delay: Duration,
 }
 
@@ -20,25 +23,30 @@ impl Default for RetryPolicy {
 }
 
 impl RetryPolicy {
+    /// Creates a new RetryPolicy with default settings
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the maximum number of retry attempts
     pub fn with_max_retries(mut self, max_retries: u32) -> Self {
         self.max_retries = max_retries;
         self
     }
 
+    /// Sets the initial delay before first retry
     pub fn with_initial_delay(mut self, delay: Duration) -> Self {
         self.initial_delay = delay;
         self
     }
 
+    /// Sets the maximum delay between retries
     pub fn with_max_delay(mut self, delay: Duration) -> Self {
         self.max_delay = delay;
         self
     }
 
+    /// Executes the given function with retry logic using exponential backoff
     pub async fn retry<F, Fut, T, E>(&self, mut f: F) -> Result<T, E>
     where
         F: FnMut() -> Fut,

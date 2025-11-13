@@ -21,6 +21,7 @@ pub struct StreamTextBuilder {
 }
 
 impl StreamTextBuilder {
+    /// Creates a new StreamTextBuilder with default settings
     pub fn new() -> Self {
         Self {
             model: None,
@@ -130,14 +131,22 @@ impl StreamTextResult {
 /// Parts emitted by the text stream
 #[derive(Debug, Clone)]
 pub enum TextStreamPart {
+    /// A chunk of text from the model
     TextDelta(String),
+    /// A tool call made by the model
     ToolCall(ToolCallPart),
+    /// The result of a tool execution
     ToolResult(ToolResultPart),
+    /// Indicates a generation step has finished
     StepFinish {
+        /// Index of the step that finished
         step_index: u32,
+        /// Reason why the step finished
         finish_reason: FinishReason,
     },
+    /// Indicates the entire generation is complete
     Finish {
+        /// Total token usage across all steps
         total_usage: Usage,
     },
 }

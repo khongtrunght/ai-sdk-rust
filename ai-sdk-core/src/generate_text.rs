@@ -19,6 +19,7 @@ pub struct GenerateTextBuilder {
 }
 
 impl GenerateTextBuilder {
+    /// Creates a new GenerateTextBuilder with default settings
     pub fn new() -> Self {
         Self {
             model: None,
@@ -246,10 +247,15 @@ impl GenerateTextResult {
 /// Result of a single generation step
 #[derive(Debug, Clone)]
 pub struct StepResult {
+    /// Index of this step in the generation sequence
     pub step_index: u32,
+    /// Content returned by the model in this step
     pub response_content: Vec<Content>,
+    /// Tool calls made by the model in this step
     pub tool_calls: Vec<ToolCallPart>,
+    /// Reason why generation finished
     pub finish_reason: FinishReason,
+    /// Token usage for this step
     pub usage: Usage,
 }
 

@@ -2,6 +2,7 @@ use ai_sdk_provider::FinishReason;
 
 /// Trait for determining when to stop the tool execution loop
 pub trait StopCondition: Send + Sync {
+    /// Returns true if the tool execution loop should stop
     fn should_stop(&self, step: u32, finish_reason: &FinishReason) -> bool;
 }
 
@@ -31,11 +32,12 @@ impl StopCondition for StopOnFinish {
     }
 }
 
-/// Helper functions to create stop conditions
+/// Creates a stop condition that stops after a maximum number of steps
 pub fn stop_after_steps(max_steps: u32) -> Box<dyn StopCondition> {
     Box::new(StopAfterSteps::new(max_steps))
 }
 
+/// Creates a stop condition that stops when the model returns a non-ToolCalls finish reason
 pub fn stop_on_finish() -> Box<dyn StopCondition> {
     Box::new(StopOnFinish)
 }

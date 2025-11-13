@@ -7,7 +7,9 @@ use std::sync::Arc;
 
 /// Context provided to tools during execution
 pub struct ToolContext {
+    /// ID of the tool call being executed
     pub tool_call_id: String,
+    /// Conversation messages leading up to this tool call
     pub messages: Vec<Message>,
 }
 
@@ -42,6 +44,7 @@ pub struct ToolExecutor {
 }
 
 impl ToolExecutor {
+    /// Creates a new ToolExecutor with the given tools
     pub fn new(tools: Vec<Arc<dyn Tool>>) -> Self {
         Self { tools }
     }
@@ -114,6 +117,7 @@ impl ToolExecutor {
         self.tools.iter().find(|t| t.name() == name).cloned()
     }
 
+    /// Returns the list of available tools
     pub fn tools(&self) -> &[Arc<dyn Tool>] {
         &self.tools
     }
