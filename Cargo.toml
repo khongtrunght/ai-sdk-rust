@@ -1,5 +1,5 @@
 [workspace]
-members = ["ai-sdk-provider", "ai-sdk-openai"]
+members = ["ai-sdk-provider", "ai-sdk-openai", "ai-sdk-core"]
 resolver = "2"
 
 [workspace.package]
@@ -30,3 +30,5 @@ anyhow = "1.0"
 
 # Utilities
 derive_builder = "0.20"
+backoff = "0.4"
+tracing = "0.1"
