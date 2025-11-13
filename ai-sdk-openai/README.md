@@ -136,7 +136,3 @@ Licensed under either of:
 - MIT license ([LICENSE-MIT](https://github.com/khongtrunght/ai-sdk-rust/blob/main/LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
-
-## Security
-
-For security vulnerabilities, please see [SECURITY.md](https://github.com/khongtrunght/ai-sdk-rust/blob/main/SECURITY.md).
