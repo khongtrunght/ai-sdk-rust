@@ -1,15 +1,13 @@
 use ai_sdk_openai::OpenAIChatModel;
-use ai_sdk_provider::language_model::{
-    FunctionTool, Message, Tool, ToolChoice, UserContentPart,
-};
+use ai_sdk_provider::language_model::{FunctionTool, Message, Tool, ToolChoice, UserContentPart};
 use ai_sdk_provider::{CallOptions, Content, FinishReason, LanguageModel, StreamPart};
 use futures::stream::StreamExt;
 
 #[tokio::test]
 #[ignore] // Requires OPENAI_API_KEY
 async fn test_tool_calling_non_streaming() {
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .expect("OPENAI_API_KEY environment variable not set");
+    let api_key =
+        std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable not set");
 
     let model = OpenAIChatModel::new("gpt-4", api_key);
 
@@ -74,8 +72,8 @@ async fn test_tool_calling_non_streaming() {
         assert!(!tool_call.input.is_empty());
 
         // Parse the input to verify it contains location
-        let input: serde_json::Value = serde_json::from_str(&tool_call.input)
-            .expect("Tool input should be valid JSON");
+        let input: serde_json::Value =
+            serde_json::from_str(&tool_call.input).expect("Tool input should be valid JSON");
         assert!(
             input.get("location").is_some(),
             "Tool input should contain location"
@@ -86,8 +84,8 @@ async fn test_tool_calling_non_streaming() {
 #[tokio::test]
 #[ignore] // Requires OPENAI_API_KEY
 async fn test_tool_calling_streaming() {
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .expect("OPENAI_API_KEY environment variable not set");
+    let api_key =
+        std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable not set");
 
     let model = OpenAIChatModel::new("gpt-4", api_key);
 
@@ -155,14 +153,8 @@ async fn test_tool_calling_streaming() {
         }
     }
 
-    assert!(
-        has_tool_input_start,
-        "Stream should contain ToolInputStart"
-    );
-    assert!(
-        has_tool_input_delta,
-        "Stream should contain ToolInputDelta"
-    );
+    assert!(has_tool_input_start, "Stream should contain ToolInputStart");
+    assert!(has_tool_input_delta, "Stream should contain ToolInputDelta");
     assert!(has_tool_input_end, "Stream should contain ToolInputEnd");
     assert!(has_tool_call, "Stream should contain ToolCall");
     assert_eq!(
@@ -175,8 +167,8 @@ async fn test_tool_calling_streaming() {
 #[tokio::test]
 #[ignore] // Requires OPENAI_API_KEY
 async fn test_multiple_tools() {
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .expect("OPENAI_API_KEY environment variable not set");
+    let api_key =
+        std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable not set");
 
     let model = OpenAIChatModel::new("gpt-4", api_key);
 
@@ -241,8 +233,8 @@ async fn test_multiple_tools() {
 #[tokio::test]
 #[ignore] // Requires OPENAI_API_KEY
 async fn test_no_tool_calls_when_not_needed() {
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .expect("OPENAI_API_KEY environment variable not set");
+    let api_key =
+        std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable not set");
 
     let model = OpenAIChatModel::new("gpt-4", api_key);
 

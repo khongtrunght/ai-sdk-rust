@@ -103,7 +103,9 @@ impl OpenAIChatModel {
                     for tool_result in content {
                         openai_messages.push(crate::api_types::ChatMessage {
                             role: "tool".into(),
-                            content: Some(serde_json::to_string(&tool_result.result).unwrap_or_default()),
+                            content: Some(
+                                serde_json::to_string(&tool_result.result).unwrap_or_default(),
+                            ),
                             tool_calls: None,
                             tool_call_id: Some(tool_result.tool_call_id.clone()),
                         });
@@ -115,10 +117,7 @@ impl OpenAIChatModel {
         openai_messages
     }
 
-    fn convert_tools(
-        &self,
-        tools: &[language_model::Tool],
-    ) -> Vec<crate::api_types::OpenAITool> {
+    fn convert_tools(&self, tools: &[language_model::Tool]) -> Vec<crate::api_types::OpenAITool> {
         tools
             .iter()
             .filter_map(|tool| match tool {
