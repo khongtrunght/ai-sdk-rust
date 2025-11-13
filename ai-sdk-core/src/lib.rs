@@ -83,6 +83,8 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
 
+mod embed;
+mod embed_many;
 mod error;
 mod generate_text;
 mod retry;
@@ -90,19 +92,16 @@ mod stop_condition;
 mod stream_text;
 mod tool;
 
-// Note: embed and embed_many modules will be added in Phase 1.3
-// mod embed;
-// mod embed_many;
-
 // Re-export commonly used types from ai-sdk-provider
 pub use ai_sdk_provider::language_model::{
-    CallOptions, Content, FinishReason, LanguageModel, Message, ToolCallPart, ToolResultPart,
-    Usage,
+    CallOptions, Content, FinishReason, LanguageModel, Message, ToolCallPart, ToolResultPart, Usage,
 };
-pub use ai_sdk_provider::JsonValue;
+pub use ai_sdk_provider::{EmbeddingModel, EmbeddingUsage, JsonValue};
 
 // Re-export core functionality
-pub use error::{GenerateTextError, StreamTextError, ToolError};
+pub use embed::{embed, EmbedBuilder, EmbedResult};
+pub use embed_many::{embed_many, EmbedManyBuilder, EmbedManyResult};
+pub use error::{EmbedError, GenerateTextError, StreamTextError, ToolError};
 pub use generate_text::{generate_text, GenerateTextBuilder, GenerateTextResult, StepResult};
 pub use retry::RetryPolicy;
 pub use stop_condition::{stop_after_steps, stop_on_finish, StopCondition};

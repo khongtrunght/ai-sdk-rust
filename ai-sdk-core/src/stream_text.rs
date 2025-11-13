@@ -1,10 +1,10 @@
+use crate::error::StreamTextError;
+use crate::tool::{Tool, ToolExecutor};
 use ai_sdk_provider::language_model::{
     AssistantContentPart, CallOptions, Content, FinishReason, LanguageModel, Message, StreamPart,
     TextPart, Tool as ProviderTool, ToolCallPart, ToolChoice, ToolResultPart, Usage,
     UserContentPart,
 };
-use crate::error::StreamTextError;
-use crate::tool::{Tool, ToolExecutor};
 use async_stream::stream;
 use std::pin::Pin;
 use std::sync::Arc;

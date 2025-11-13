@@ -1,6 +1,6 @@
+use crate::error::ToolError;
 use ai_sdk_provider::language_model::{FunctionTool, Message, ToolCallPart, ToolResultPart};
 use ai_sdk_provider::JsonValue;
-use crate::error::ToolError;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
@@ -26,11 +26,7 @@ pub trait Tool: Send + Sync {
     fn input_schema(&self) -> Value;
 
     /// Execute the tool with given input
-    async fn execute(
-        &self,
-        input: Value,
-        context: &ToolContext,
-    ) -> Result<JsonValue, ToolError>;
+    async fn execute(&self, input: Value, context: &ToolContext) -> Result<JsonValue, ToolError>;
 
     /// Check if this tool requires approval before execution
     fn needs_approval(&self, _input: &Value) -> bool {
@@ -84,8 +80,9 @@ impl ToolExecutor {
                 };
 
                 // Parse input
-                let input: Value = serde_json::from_str(&input_str)
-                    .map_err(|e| ToolError::invalid_input(format!("Failed to parse input: {}", e)))?;
+                let input: Value = serde_json::from_str(&input_str).map_err(|e| {
+                    ToolError::invalid_input(format!("Failed to parse input: {}", e))
+                })?;
 
                 // Check approval
                 if tool.needs_approval(&input) {

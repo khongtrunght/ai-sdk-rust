@@ -1,10 +1,10 @@
+use crate::error::GenerateTextError;
+use crate::retry::RetryPolicy;
+use crate::tool::{Tool, ToolExecutor};
 use ai_sdk_provider::language_model::{
     AssistantContentPart, CallOptions, Content, FinishReason, LanguageModel, Message, TextPart,
     Tool as ProviderTool, ToolCallPart, ToolChoice, Usage, UserContentPart,
 };
-use crate::error::GenerateTextError;
-use crate::retry::RetryPolicy;
-use crate::tool::{Tool, ToolExecutor};
 use std::sync::Arc;
 
 /// Builder for text generation with optional tool calling
@@ -110,12 +110,7 @@ impl GenerateTextBuilder {
             // Add tools if available
             if !tool_executor.tools().is_empty() {
                 let tool_defs = tool_executor.tool_definitions();
-                options.tools = Some(
-                    tool_defs
-                        .into_iter()
-                        .map(ProviderTool::Function)
-                        .collect(),
-                );
+                options.tools = Some(tool_defs.into_iter().map(ProviderTool::Function).collect());
                 options.tool_choice = Some(ToolChoice::Auto);
             }
 
@@ -197,10 +192,7 @@ impl GenerateTextBuilder {
             });
         }
 
-        Ok(GenerateTextResult {
-            steps,
-            total_usage,
-        })
+        Ok(GenerateTextResult { steps, total_usage })
     }
 }
 
