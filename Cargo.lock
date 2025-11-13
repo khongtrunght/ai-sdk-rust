@@ -23,7 +23,7 @@ dependencies = [
 
 [[package]]
 name = "ai-sdk-openai"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ai-sdk-provider",
  "async-stream",
@@ -40,7 +40,7 @@ dependencies = [
 
 [[package]]
 name = "ai-sdk-provider"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "serde",
