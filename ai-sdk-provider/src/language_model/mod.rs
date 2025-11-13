@@ -28,7 +28,7 @@ pub use content::{
 };
 pub use data_content::DataContent;
 pub use finish_reason::FinishReason;
-pub use prompt::{AssistantContentPart, Message, Prompt, UserContentPart};
+pub use prompt::{AssistantContentPart, FileData, Message, Prompt, UserContentPart};
 pub use response_metadata::ResponseMetadata;
 pub use stream::{CallWarning, StreamPart};
 pub use tools::{FunctionTool, ProviderDefinedTool, Tool, ToolChoice};

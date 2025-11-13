@@ -45,8 +45,8 @@ pub struct ReasoningPart {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilePart {
-    /// File data (binary, base64, or URL)
-    pub data: Vec<u8>,
+    /// File data (binary or URL)
+    pub data: super::FileData,
 
     /// MIME type (e.g., "image/jpeg")
     pub media_type: String,

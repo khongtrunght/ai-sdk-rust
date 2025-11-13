@@ -17,11 +17,21 @@ pub struct ChatCompletionRequest {
     pub tool_choice: Option<OpenAIToolChoice>,
 }
 
+/// Content for a chat message - can be string or array of content parts
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ChatMessageContent {
+    /// Simple text content
+    Text(String),
+    /// Array of content parts (for multi-modal messages)
+    Parts(Vec<crate::multimodal::OpenAIContentPart>),
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
     pub role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
+    pub content: Option<ChatMessageContent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<OpenAIToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]

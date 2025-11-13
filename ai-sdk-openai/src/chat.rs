@@ -36,28 +36,93 @@ impl OpenAIChatModel {
                 Message::System { content } => {
                     openai_messages.push(crate::api_types::ChatMessage {
                         role: "system".into(),
-                        content: Some(content.clone()),
+                        content: Some(crate::api_types::ChatMessageContent::Text(content.clone())),
                         tool_calls: None,
                         tool_call_id: None,
                     });
                 }
                 Message::User { content } => {
-                    let text_content = content
+                    // Check if we have any file content (multi-modal)
+                    let has_files = content
                         .iter()
-                        .filter_map(|part| match part {
-                            UserContentPart::Text { text } => Some(text.clone()),
-                            // Skip files for now (Phase 2 will add multi-modal support)
-                            UserContentPart::File { .. } => None,
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n");
+                        .any(|part| matches!(part, UserContentPart::File { .. }));
 
-                    openai_messages.push(crate::api_types::ChatMessage {
-                        role: "user".into(),
-                        content: Some(text_content),
-                        tool_calls: None,
-                        tool_call_id: None,
-                    });
+                    if has_files {
+                        // Multi-modal message: convert to array of content parts
+                        let mut openai_content = Vec::new();
+
+                        for part in content {
+                            match part {
+                                UserContentPart::Text { text } => {
+                                    openai_content.push(
+                                        crate::multimodal::OpenAIContentPart::Text {
+                                            text: text.clone(),
+                                        },
+                                    );
+                                }
+                                UserContentPart::File { data, media_type } => {
+                                    // Determine file type and convert accordingly
+                                    if media_type.starts_with("image/") {
+                                        match crate::multimodal::convert_image_part(
+                                            data, media_type,
+                                        ) {
+                                            Ok(part) => openai_content.push(part),
+                                            Err(e) => {
+                                                // Log error but continue
+                                                eprintln!(
+                                                    "Warning: Failed to convert image: {}",
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    } else if media_type.starts_with("audio/") {
+                                        match crate::multimodal::convert_audio_part(
+                                            data, media_type,
+                                        ) {
+                                            Ok(part) => openai_content.push(part),
+                                            Err(e) => {
+                                                eprintln!(
+                                                    "Warning: Failed to convert audio: {}",
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    } else {
+                                        eprintln!(
+                                            "Warning: Unsupported media type: {}",
+                                            media_type
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
+                        openai_messages.push(crate::api_types::ChatMessage {
+                            role: "user".into(),
+                            content: Some(crate::api_types::ChatMessageContent::Parts(
+                                openai_content,
+                            )),
+                            tool_calls: None,
+                            tool_call_id: None,
+                        });
+                    } else {
+                        // Text-only message: join all text parts
+                        let text_content = content
+                            .iter()
+                            .filter_map(|part| match part {
+                                UserContentPart::Text { text } => Some(text.clone()),
+                                UserContentPart::File { .. } => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        openai_messages.push(crate::api_types::ChatMessage {
+                            role: "user".into(),
+                            content: Some(crate::api_types::ChatMessageContent::Text(text_content)),
+                            tool_calls: None,
+                            tool_call_id: None,
+                        });
+                    }
                 }
                 Message::Assistant { content } => {
                     let mut text_content = String::new();
@@ -88,7 +153,7 @@ impl OpenAIChatModel {
                         content: if text_content.is_empty() {
                             None
                         } else {
-                            Some(text_content)
+                            Some(crate::api_types::ChatMessageContent::Text(text_content))
                         },
                         tool_calls: if tool_calls.is_empty() {
                             None
@@ -103,9 +168,9 @@ impl OpenAIChatModel {
                     for tool_result in content {
                         openai_messages.push(crate::api_types::ChatMessage {
                             role: "tool".into(),
-                            content: Some(
+                            content: Some(crate::api_types::ChatMessageContent::Text(
                                 serde_json::to_string(&tool_result.result).unwrap_or_default(),
-                            ),
+                            )),
                             tool_calls: None,
                             tool_call_id: Some(tool_result.tool_call_id.clone()),
                         });
@@ -230,10 +295,28 @@ impl LanguageModel for OpenAIChatModel {
         let mut content = Vec::new();
 
         // Add text content if present
-        if let Some(text) = &choice.message.content {
+        if let Some(message_content) = &choice.message.content {
+            // Extract text from ChatMessageContent
+            let text = match message_content {
+                crate::api_types::ChatMessageContent::Text(s) => s.clone(),
+                crate::api_types::ChatMessageContent::Parts(parts) => {
+                    // Join text parts if we somehow get a multi-part response
+                    parts
+                        .iter()
+                        .filter_map(|part| match part {
+                            crate::multimodal::OpenAIContentPart::Text { text } => {
+                                Some(text.clone())
+                            }
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }
+            };
+
             if !text.is_empty() {
                 content.push(Content::Text(TextPart {
-                    text: text.clone(),
+                    text,
                     provider_metadata: None,
                 }));
             }

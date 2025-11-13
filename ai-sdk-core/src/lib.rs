@@ -92,6 +92,9 @@ mod stop_condition;
 mod stream_text;
 mod tool;
 
+/// Utility functions for media type detection, file download, and base64 encoding
+pub mod util;
+
 // Re-export commonly used types from ai-sdk-provider
 pub use ai_sdk_provider::language_model::{
     CallOptions, Content, FinishReason, LanguageModel, Message, ToolCallPart, ToolResultPart, Usage,

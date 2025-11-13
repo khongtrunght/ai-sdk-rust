@@ -30,6 +30,16 @@ pub enum Message {
     },
 }
 
+/// File data representation supporting both binary data and URLs
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum FileData {
+    /// Binary file data
+    Binary(Vec<u8>),
+    /// URL pointing to a file
+    Url(String),
+}
+
 /// Content part in a user message
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
@@ -41,8 +51,8 @@ pub enum UserContentPart {
     },
     /// File content part (images, audio, etc.)
     File {
-        /// Binary file data
-        data: Vec<u8>,
+        /// File data (binary or URL)
+        data: FileData,
         /// MIME type of the file
         media_type: String,
     },
@@ -91,13 +101,24 @@ mod tests {
     }
 
     #[test]
-    fn test_user_content_file() {
+    fn test_user_content_file_binary() {
         let part = UserContentPart::File {
-            data: vec![1, 2, 3],
+            data: FileData::Binary(vec![1, 2, 3]),
             media_type: "image/png".into(),
         };
         let json = serde_json::to_value(&part).unwrap();
         assert_eq!(json["type"], "file");
         assert_eq!(json["media_type"], "image/png");
+    }
+
+    #[test]
+    fn test_user_content_file_url() {
+        let part = UserContentPart::File {
+            data: FileData::Url("https://example.com/image.jpg".into()),
+            media_type: "image/jpeg".into(),
+        };
+        let json = serde_json::to_value(&part).unwrap();
+        assert_eq!(json["type"], "file");
+        assert_eq!(json["media_type"], "image/jpeg");
     }
 }
