@@ -1,4 +1,6 @@
-use ai_sdk_provider::language_model::{Message, StreamError, TextPart, UserContentPart};
+use ai_sdk_provider::language_model::{
+    AssistantContentPart, Message, StreamError, TextPart, ToolCallPart, UserContentPart,
+};
 use ai_sdk_provider::*;
 use async_stream::stream;
 use async_trait::async_trait;
@@ -27,36 +29,137 @@ impl OpenAIChatModel {
 
     fn convert_prompt_to_messages(&self, prompt: &[Message]) -> Vec<crate::api_types::ChatMessage> {
         // Convert our prompt format to OpenAI's message format
-        prompt
-            .iter()
-            .map(|msg| {
-                match msg {
-                    Message::System { content } => crate::api_types::ChatMessage {
+        let mut openai_messages = Vec::new();
+
+        for msg in prompt {
+            match msg {
+                Message::System { content } => {
+                    openai_messages.push(crate::api_types::ChatMessage {
                         role: "system".into(),
-                        content: content.clone(),
-                    },
-                    Message::User { content } => crate::api_types::ChatMessage {
-                        role: "user".into(),
-                        content: content
-                            .iter()
-                            .filter_map(|part| match part {
-                                UserContentPart::Text { text } => Some(text.clone()),
-                                _ => None,
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n"),
-                    },
-                    Message::Assistant { content } => crate::api_types::ChatMessage {
-                        role: "assistant".into(),
-                        content: format!("{:?}", content), // Simplified
-                    },
-                    Message::Tool { .. } => crate::api_types::ChatMessage {
-                        role: "tool".into(),
-                        content: "".into(),
-                    },
+                        content: Some(content.clone()),
+                        tool_calls: None,
+                        tool_call_id: None,
+                    });
                 }
+                Message::User { content } => {
+                    let text_content = content
+                        .iter()
+                        .filter_map(|part| match part {
+                            UserContentPart::Text { text } => Some(text.clone()),
+                            // Skip files for now (Phase 2 will add multi-modal support)
+                            UserContentPart::File { .. } => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+
+                    openai_messages.push(crate::api_types::ChatMessage {
+                        role: "user".into(),
+                        content: Some(text_content),
+                        tool_calls: None,
+                        tool_call_id: None,
+                    });
+                }
+                Message::Assistant { content } => {
+                    let mut text_content = String::new();
+                    let mut tool_calls = Vec::new();
+
+                    for part in content {
+                        match part {
+                            AssistantContentPart::Text(text_part) => {
+                                text_content.push_str(&text_part.text);
+                            }
+                            AssistantContentPart::ToolCall(tool_call) => {
+                                tool_calls.push(crate::api_types::OpenAIToolCall {
+                                    id: tool_call.tool_call_id.clone(),
+                                    r#type: "function".to_string(),
+                                    function: crate::api_types::OpenAIFunctionCall {
+                                        name: tool_call.tool_name.clone(),
+                                        arguments: tool_call.input.clone(),
+                                    },
+                                });
+                            }
+                            // Skip other content types for now
+                            _ => {}
+                        }
+                    }
+
+                    openai_messages.push(crate::api_types::ChatMessage {
+                        role: "assistant".into(),
+                        content: if text_content.is_empty() {
+                            None
+                        } else {
+                            Some(text_content)
+                        },
+                        tool_calls: if tool_calls.is_empty() {
+                            None
+                        } else {
+                            Some(tool_calls)
+                        },
+                        tool_call_id: None,
+                    });
+                }
+                Message::Tool { content } => {
+                    // Convert tool results to OpenAI tool messages
+                    for tool_result in content {
+                        openai_messages.push(crate::api_types::ChatMessage {
+                            role: "tool".into(),
+                            content: Some(
+                                serde_json::to_string(&tool_result.result).unwrap_or_default(),
+                            ),
+                            tool_calls: None,
+                            tool_call_id: Some(tool_result.tool_call_id.clone()),
+                        });
+                    }
+                }
+            }
+        }
+
+        openai_messages
+    }
+
+    fn convert_tools(&self, tools: &[language_model::Tool]) -> Vec<crate::api_types::OpenAITool> {
+        tools
+            .iter()
+            .filter_map(|tool| match tool {
+                language_model::Tool::Function(function_tool) => {
+                    Some(crate::api_types::OpenAITool {
+                        r#type: "function".to_string(),
+                        function: crate::api_types::OpenAIFunction {
+                            name: function_tool.name.clone(),
+                            description: function_tool.description.clone(),
+                            parameters: function_tool.input_schema.clone(),
+                        },
+                    })
+                }
+                // Skip provider-defined tools for now
+                language_model::Tool::ProviderDefined(_) => None,
             })
             .collect()
+    }
+
+    fn convert_tool_choice(
+        &self,
+        tool_choice: &language_model::ToolChoice,
+    ) -> crate::api_types::OpenAIToolChoice {
+        match tool_choice {
+            language_model::ToolChoice::Auto => {
+                crate::api_types::OpenAIToolChoice::String("auto".to_string())
+            }
+            language_model::ToolChoice::None => {
+                crate::api_types::OpenAIToolChoice::String("none".to_string())
+            }
+            language_model::ToolChoice::Required => {
+                crate::api_types::OpenAIToolChoice::String("required".to_string())
+            }
+            language_model::ToolChoice::Tool { tool_name } => {
+                crate::api_types::OpenAIToolChoice::Specific {
+                    r#type: "function".to_string(),
+                    function: crate::api_types::OpenAIFunctionName {
+                        name: tool_name.clone(),
+                    },
+                }
+            }
+        }
     }
 
     fn map_finish_reason(&self, reason: Option<&str>) -> FinishReason {
@@ -96,6 +199,11 @@ impl LanguageModel for OpenAIChatModel {
             temperature: options.temperature,
             max_tokens: options.max_output_tokens,
             stream: Some(false),
+            tools: options.tools.as_ref().map(|t| self.convert_tools(t)),
+            tool_choice: options
+                .tool_choice
+                .as_ref()
+                .map(|tc| self.convert_tool_choice(tc)),
         };
 
         let response = self
@@ -118,10 +226,32 @@ impl LanguageModel for OpenAIChatModel {
 
         let choice = &api_response.choices[0];
 
-        let content = vec![Content::Text(TextPart {
-            text: choice.message.content.clone(),
-            provider_metadata: None,
-        })];
+        // Build content from the response
+        let mut content = Vec::new();
+
+        // Add text content if present
+        if let Some(text) = &choice.message.content {
+            if !text.is_empty() {
+                content.push(Content::Text(TextPart {
+                    text: text.clone(),
+                    provider_metadata: None,
+                }));
+            }
+        }
+
+        // Add tool calls if present
+        if let Some(tool_calls) = &choice.message.tool_calls {
+            for tool_call in tool_calls {
+                content.push(Content::ToolCall(ToolCallPart {
+                    tool_call_id: tool_call.id.clone(),
+                    tool_name: tool_call.function.name.clone(),
+                    input: tool_call.function.arguments.clone(),
+                    provider_executed: None,
+                    dynamic: None,
+                    provider_metadata: None,
+                }));
+            }
+        }
 
         let usage = api_response
             .usage
@@ -135,9 +265,16 @@ impl LanguageModel for OpenAIChatModel {
             })
             .unwrap_or_default();
 
+        // Set finish reason based on whether tool calls were made
+        let finish_reason = if choice.message.tool_calls.is_some() {
+            FinishReason::ToolCalls
+        } else {
+            self.map_finish_reason(choice.finish_reason.as_deref())
+        };
+
         Ok(GenerateResponse {
             content,
-            finish_reason: self.map_finish_reason(choice.finish_reason.as_deref()),
+            finish_reason,
             usage,
             provider_metadata: None,
             request: None,
@@ -156,6 +293,11 @@ impl LanguageModel for OpenAIChatModel {
             temperature: options.temperature,
             max_tokens: options.max_output_tokens,
             stream: Some(true),
+            tools: options.tools.as_ref().map(|t| self.convert_tools(t)),
+            tool_choice: options
+                .tool_choice
+                .as_ref()
+                .map(|tc| self.convert_tool_choice(tc)),
         };
 
         let response = self
@@ -178,6 +320,7 @@ impl LanguageModel for OpenAIChatModel {
         let stream_impl = stream! {
             let mut byte_stream = response.bytes_stream();
             let mut buffer = String::new();
+            let mut tool_calls: Vec<crate::api_types::OpenAIToolCall> = Vec::new();
 
             while let Some(chunk_result) = byte_stream.next().await {
                 match chunk_result {
@@ -198,6 +341,7 @@ impl LanguageModel for OpenAIChatModel {
                                 if let Ok(chunk) = serde_json::from_str::<crate::api_types::ChatCompletionChunk>(data) {
                                     // Convert OpenAI chunk to our StreamPart
                                     if let Some(choice) = chunk.choices.first() {
+                                        // Handle text content
                                         if let Some(content) = &choice.delta.content {
                                             yield Ok(StreamPart::TextDelta {
                                                 id: "0".into(),
@@ -206,9 +350,70 @@ impl LanguageModel for OpenAIChatModel {
                                             });
                                         }
 
+                                        // Handle tool call deltas
+                                        if let Some(tool_call_deltas) = &choice.delta.tool_calls {
+                                            for tool_call_delta in tool_call_deltas {
+                                                let index = tool_call_delta.index as usize;
+
+                                                // Initialize new tool call if needed
+                                                if tool_calls.len() <= index {
+                                                    let tool_id = tool_call_delta.id.clone().unwrap_or_default();
+                                                    let tool_name = tool_call_delta.function.name.clone().unwrap_or_default();
+
+                                                    tool_calls.push(crate::api_types::OpenAIToolCall {
+                                                        id: tool_id.clone(),
+                                                        r#type: "function".to_string(),
+                                                        function: crate::api_types::OpenAIFunctionCall {
+                                                            name: tool_name.clone(),
+                                                            arguments: String::new(),
+                                                        },
+                                                    });
+
+                                                    // Emit ToolInputStart
+                                                    yield Ok(StreamPart::ToolInputStart {
+                                                        id: tool_id,
+                                                        tool_name,
+                                                        provider_metadata: None,
+                                                        provider_executed: None,
+                                                        dynamic: None,
+                                                        title: None,
+                                                    });
+                                                }
+
+                                                // Accumulate arguments
+                                                if let Some(args_delta) = &tool_call_delta.function.arguments {
+                                                    tool_calls[index].function.arguments.push_str(args_delta);
+
+                                                    // Emit ToolInputDelta
+                                                    yield Ok(StreamPart::ToolInputDelta {
+                                                        id: tool_calls[index].id.clone(),
+                                                        delta: args_delta.clone(),
+                                                        provider_metadata: None,
+                                                    });
+                                                }
+                                            }
+                                        }
+
                                         // Handle finish reason
                                         if let Some(finish_reason) = &choice.finish_reason {
                                             if !finish_reason.is_empty() && finish_reason != "null" {
+                                                // Emit ToolInputEnd and ToolCall for each complete tool
+                                                for tool_call in &tool_calls {
+                                                    yield Ok(StreamPart::ToolInputEnd {
+                                                        id: tool_call.id.clone(),
+                                                        provider_metadata: None,
+                                                    });
+
+                                                    yield Ok(StreamPart::ToolCall(ToolCallPart {
+                                                        tool_call_id: tool_call.id.clone(),
+                                                        tool_name: tool_call.function.name.clone(),
+                                                        input: tool_call.function.arguments.clone(),
+                                                        provider_executed: None,
+                                                        dynamic: None,
+                                                        provider_metadata: None,
+                                                    }));
+                                                }
+
                                                 let mapped_reason = match finish_reason.as_str() {
                                                     "stop" => FinishReason::Stop,
                                                     "length" => FinishReason::Length,

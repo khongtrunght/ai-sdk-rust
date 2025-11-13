@@ -1,0 +1,25 @@
+[package]
+name = "ai-sdk-core"
+version = "0.1.0"
+edition = "2021"
+description = "High-level APIs for AI SDK - text generation, embeddings, and tool execution"
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+ai-sdk-provider = { path = "../ai-sdk-provider" }
+async-trait.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tokio-stream.workspace = true
+async-stream.workspace = true
+futures.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+backoff = "0.4"
+tracing = "0.1"
+
+[dev-dependencies]
+ai-sdk-openai = { path = "../ai-sdk-openai" }
+tokio-test = "0.4"
