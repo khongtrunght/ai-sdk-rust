@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "ai-sdk-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ai-sdk-openai",
  "ai-sdk-provider",
@@ -23,7 +23,7 @@ dependencies = [
 
 [[package]]
 name = "ai-sdk-openai"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ai-sdk-provider",
  "async-stream",
@@ -40,7 +40,7 @@ dependencies = [
 
 [[package]]
 name = "ai-sdk-provider"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "serde",
