@@ -1,32 +1,31 @@
 [workspace]
-# Update all crates together (unified versioning)
-release = true
-
-# Git configuration
+# Per-package versioning - each package gets its own version and tag
 git_tag_enable = true
-git_tag_name = "v{{ version }}"
 git_release_enable = true
 git_release_type = "auto"
 
-# Changelog configuration - workspace level only
+# Workspace-level changelog
 changelog_update = true
 changelog_path = "CHANGELOG.md"
 changelog_config = "cliff.toml"
 
-# Publish configuration
+# Default publish configuration for all packages
 publish = true
 publish_timeout = "10m"
 publish_allow_dirty = false
 
-# Disable package-level changelogs to avoid duplicates
+# Package-specific configurations with individual tags
+[[package]]
+name = "ai-sdk-core"
+git_tag_name = "ai-sdk-core@{{ version }}"
+changelog_update = false
+
 [[package]]
 name = "ai-sdk-provider"
+git_tag_name = "ai-sdk-provider@{{ version }}"
 changelog_update = false
 
 [[package]]
 name = "ai-sdk-openai"
-changelog_update = false
-
-[[package]]
-name = "ai-sdk-core"
+git_tag_name = "ai-sdk-openai@{{ version }}"
 changelog_update = false
