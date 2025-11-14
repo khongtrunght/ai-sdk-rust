@@ -101,6 +101,9 @@ pub mod generate_object;
 /// Agent framework for autonomous tool-using agents
 pub mod agent;
 
+/// Middleware system for customizing language model behavior
+pub mod middleware;
+
 // Re-export commonly used types from ai-sdk-provider
 pub use ai_sdk_provider::language_model::{
     CallOptions, Content, FinishReason, LanguageModel, Message, ToolCallPart, ToolResultPart, Usage,
