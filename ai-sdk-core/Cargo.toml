@@ -27,6 +27,8 @@ serde_json.workspace = true
 thiserror.workspace = true
 backoff = "0.4"
 tracing = "0.1"
+reqwest.workspace = true
+base64 = "0.22"
 
 [dev-dependencies]
 ai-sdk-openai = { version = "0.1.1", path = "../ai-sdk-openai" }

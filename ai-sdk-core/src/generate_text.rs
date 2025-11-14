@@ -209,6 +209,13 @@ pub struct GenerateTextResult {
 }
 
 impl GenerateTextResult {
+    /// Create a new GenerateTextResult
+    pub(crate) fn new(steps: Vec<StepResult>, total_usage: Usage) -> Self {
+        Self { steps, total_usage }
+    }
+}
+
+impl GenerateTextResult {
     /// Get the final text response
     pub fn text(&self) -> String {
         self.steps

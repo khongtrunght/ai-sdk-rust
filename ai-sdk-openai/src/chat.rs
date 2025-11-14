@@ -36,28 +36,93 @@ impl OpenAIChatModel {
                 Message::System { content } => {
                     openai_messages.push(crate::api_types::ChatMessage {
                         role: "system".into(),
-                        content: Some(content.clone()),
+                        content: Some(crate::api_types::ChatMessageContent::Text(content.clone())),
                         tool_calls: None,
                         tool_call_id: None,
                     });
                 }
                 Message::User { content } => {
-                    let text_content = content
+                    // Check if we have any file content (multi-modal)
+                    let has_files = content
                         .iter()
-                        .filter_map(|part| match part {
-                            UserContentPart::Text { text } => Some(text.clone()),
-                            // Skip files for now (Phase 2 will add multi-modal support)
-                            UserContentPart::File { .. } => None,
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n");
+                        .any(|part| matches!(part, UserContentPart::File { .. }));
 
-                    openai_messages.push(crate::api_types::ChatMessage {
-                        role: "user".into(),
-                        content: Some(text_content),
-                        tool_calls: None,
-                        tool_call_id: None,
-                    });
+                    if has_files {
+                        // Multi-modal message: convert to array of content parts
+                        let mut openai_content = Vec::new();
+
+                        for part in content {
+                            match part {
+                                UserContentPart::Text { text } => {
+                                    openai_content.push(
+                                        crate::multimodal::OpenAIContentPart::Text {
+                                            text: text.clone(),
+                                        },
+                                    );
+                                }
+                                UserContentPart::File { data, media_type } => {
+                                    // Determine file type and convert accordingly
+                                    if media_type.starts_with("image/") {
+                                        match crate::multimodal::convert_image_part(
+                                            data, media_type,
+                                        ) {
+                                            Ok(part) => openai_content.push(part),
+                                            Err(e) => {
+                                                // Log error but continue
+                                                eprintln!(
+                                                    "Warning: Failed to convert image: {}",
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    } else if media_type.starts_with("audio/") {
+                                        match crate::multimodal::convert_audio_part(
+                                            data, media_type,
+                                        ) {
+                                            Ok(part) => openai_content.push(part),
+                                            Err(e) => {
+                                                eprintln!(
+                                                    "Warning: Failed to convert audio: {}",
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    } else {
+                                        eprintln!(
+                                            "Warning: Unsupported media type: {}",
+                                            media_type
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
+                        openai_messages.push(crate::api_types::ChatMessage {
+                            role: "user".into(),
+                            content: Some(crate::api_types::ChatMessageContent::Parts(
+                                openai_content,
+                            )),
+                            tool_calls: None,
+                            tool_call_id: None,
+                        });
+                    } else {
+                        // Text-only message: join all text parts
+                        let text_content = content
+                            .iter()
+                            .filter_map(|part| match part {
+                                UserContentPart::Text { text } => Some(text.clone()),
+                                UserContentPart::File { .. } => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        openai_messages.push(crate::api_types::ChatMessage {
+                            role: "user".into(),
+                            content: Some(crate::api_types::ChatMessageContent::Text(text_content)),
+                            tool_calls: None,
+                            tool_call_id: None,
+                        });
+                    }
                 }
                 Message::Assistant { content } => {
                     let mut text_content = String::new();
@@ -88,7 +153,7 @@ impl OpenAIChatModel {
                         content: if text_content.is_empty() {
                             None
                         } else {
-                            Some(text_content)
+                            Some(crate::api_types::ChatMessageContent::Text(text_content))
                         },
                         tool_calls: if tool_calls.is_empty() {
                             None
@@ -103,9 +168,9 @@ impl OpenAIChatModel {
                     for tool_result in content {
                         openai_messages.push(crate::api_types::ChatMessage {
                             role: "tool".into(),
-                            content: Some(
+                            content: Some(crate::api_types::ChatMessageContent::Text(
                                 serde_json::to_string(&tool_result.result).unwrap_or_default(),
-                            ),
+                            )),
                             tool_calls: None,
                             tool_call_id: Some(tool_result.tool_call_id.clone()),
                         });
@@ -162,6 +227,35 @@ impl OpenAIChatModel {
         }
     }
 
+    fn convert_response_format(
+        &self,
+        response_format: &language_model::ResponseFormat,
+    ) -> crate::api_types::OpenAIResponseFormat {
+        match response_format {
+            language_model::ResponseFormat::Text => crate::api_types::OpenAIResponseFormat::Text,
+            language_model::ResponseFormat::Json {
+                schema,
+                name,
+                description,
+            } => {
+                if let Some(schema) = schema {
+                    // Structured output with JSON schema
+                    crate::api_types::OpenAIResponseFormat::JsonSchema {
+                        json_schema: crate::api_types::OpenAIJsonSchema {
+                            name: name.clone().unwrap_or_else(|| "response".to_string()),
+                            description: description.clone(),
+                            schema: schema.clone(),
+                            strict: Some(true), // Enable strict mode for better validation
+                        },
+                    }
+                } else {
+                    // Unvalidated JSON mode
+                    crate::api_types::OpenAIResponseFormat::JsonObject
+                }
+            }
+        }
+    }
+
     fn map_finish_reason(&self, reason: Option<&str>) -> FinishReason {
         match reason {
             Some("stop") => FinishReason::Stop,
@@ -204,6 +298,11 @@ impl LanguageModel for OpenAIChatModel {
                 .tool_choice
                 .as_ref()
                 .map(|tc| self.convert_tool_choice(tc)),
+            response_format: options
+                .response_format
+                .as_ref()
+                .map(|rf| self.convert_response_format(rf)),
+            stream_options: None, // Not needed for non-streaming
         };
 
         let response = self
@@ -230,10 +329,28 @@ impl LanguageModel for OpenAIChatModel {
         let mut content = Vec::new();
 
         // Add text content if present
-        if let Some(text) = &choice.message.content {
+        if let Some(message_content) = &choice.message.content {
+            // Extract text from ChatMessageContent
+            let text = match message_content {
+                crate::api_types::ChatMessageContent::Text(s) => s.clone(),
+                crate::api_types::ChatMessageContent::Parts(parts) => {
+                    // Join text parts if we somehow get a multi-part response
+                    parts
+                        .iter()
+                        .filter_map(|part| match part {
+                            crate::multimodal::OpenAIContentPart::Text { text } => {
+                                Some(text.clone())
+                            }
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }
+            };
+
             if !text.is_empty() {
                 content.push(Content::Text(TextPart {
-                    text: text.clone(),
+                    text,
                     provider_metadata: None,
                 }));
             }
@@ -298,6 +415,13 @@ impl LanguageModel for OpenAIChatModel {
                 .tool_choice
                 .as_ref()
                 .map(|tc| self.convert_tool_choice(tc)),
+            response_format: options
+                .response_format
+                .as_ref()
+                .map(|rf| self.convert_response_format(rf)),
+            stream_options: Some(crate::api_types::StreamOptions {
+                include_usage: true,
+            }),
         };
 
         let response = self
@@ -321,6 +445,8 @@ impl LanguageModel for OpenAIChatModel {
             let mut byte_stream = response.bytes_stream();
             let mut buffer = String::new();
             let mut tool_calls: Vec<crate::api_types::OpenAIToolCall> = Vec::new();
+            let mut accumulated_usage: Option<Usage> = None;
+            let mut last_finish_reason: Option<FinishReason> = None;
 
             while let Some(chunk_result) = byte_stream.next().await {
                 match chunk_result {
@@ -339,6 +465,17 @@ impl LanguageModel for OpenAIChatModel {
 
                                 // Parse JSON chunk and convert to StreamPart
                                 if let Ok(chunk) = serde_json::from_str::<crate::api_types::ChatCompletionChunk>(data) {
+                                    // Capture usage if present
+                                    if let Some(usage_info) = &chunk.usage {
+                                        accumulated_usage = Some(Usage {
+                                            input_tokens: Some(usage_info.prompt_tokens),
+                                            output_tokens: Some(usage_info.completion_tokens),
+                                            total_tokens: Some(usage_info.total_tokens),
+                                            reasoning_tokens: None,
+                                            cached_input_tokens: None,
+                                        });
+                                    }
+
                                     // Convert OpenAI chunk to our StreamPart
                                     if let Some(choice) = chunk.choices.first() {
                                         // Handle text content
@@ -421,11 +558,10 @@ impl LanguageModel for OpenAIChatModel {
                                                     "tool_calls" => FinishReason::ToolCalls,
                                                     _ => FinishReason::Unknown,
                                                 };
-                                                yield Ok(StreamPart::Finish {
-                                                    usage: Usage::default(),
-                                                    finish_reason: mapped_reason,
-                                                    provider_metadata: None,
-                                                });
+
+                                                // Store the finish reason but don't emit Finish yet
+                                                // OpenAI may send usage in a subsequent chunk
+                                                last_finish_reason = Some(mapped_reason);
                                             }
                                         }
                                     }
@@ -438,6 +574,17 @@ impl LanguageModel for OpenAIChatModel {
                         break;
                     }
                 }
+            }
+
+            // Emit Finish event with accumulated usage
+            // OpenAI sends usage in a separate chunk after finish_reason when stream_options.include_usage is true
+            if let Some(finish_reason) = last_finish_reason {
+                let usage_to_send = accumulated_usage.unwrap_or_default();
+                yield Ok(StreamPart::Finish {
+                    usage: usage_to_send,
+                    finish_reason,
+                    provider_metadata: None,
+                });
             }
         };
 

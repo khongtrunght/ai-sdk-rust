@@ -49,6 +49,7 @@ mod chat;
 mod embedding;
 mod error;
 mod image;
+mod multimodal;
 mod speech;
 mod transcription;
 
@@ -56,6 +57,7 @@ pub use chat::OpenAIChatModel;
 pub use embedding::OpenAIEmbeddingModel;
 pub use error::OpenAIError;
 pub use image::OpenAIImageModel;
+pub use multimodal::{convert_audio_part, convert_image_part, MultimodalError, OpenAIContentPart};
 pub use speech::OpenAISpeechModel;
 pub use transcription::OpenAITranscriptionModel;
 

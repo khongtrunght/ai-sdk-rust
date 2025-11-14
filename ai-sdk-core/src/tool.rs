@@ -71,6 +71,7 @@ impl ToolExecutor {
                 .ok_or_else(|| ToolError::not_found(&tool_call.tool_name))?;
 
             let tool_call_id = tool_call.tool_call_id.clone();
+            let tool_name = tool_call.tool_name.clone();
             let input_str = tool_call.input.clone();
 
             let future = async move {
@@ -80,25 +81,56 @@ impl ToolExecutor {
                 };
 
                 // Parse input
-                let input: Value = serde_json::from_str(&input_str).map_err(|e| {
-                    ToolError::invalid_input(format!("Failed to parse input: {}", e))
-                })?;
+                let input: Value = match serde_json::from_str(&input_str) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        // Return error result instead of propagating
+                        return Ok(ToolResultPart {
+                            tool_call_id,
+                            tool_name,
+                            result: JsonValue::String(format!("Failed to parse input: {}", e)),
+                            is_error: true,
+                            preliminary: None,
+                            provider_metadata: None,
+                        });
+                    }
+                };
 
                 // Check approval
                 if tool.needs_approval(&input) {
-                    return Err(ToolError::ExecutionDenied);
+                    // Return denial result instead of error
+                    return Ok(ToolResultPart {
+                        tool_call_id,
+                        tool_name,
+                        result: JsonValue::String("Execution denied by user".to_string()),
+                        is_error: true,
+                        preliminary: None,
+                        provider_metadata: None,
+                    });
                 }
 
-                // Execute
-                let output = tool.execute(input, &context).await?;
-
-                Ok(ToolResultPart {
-                    tool_call_id,
-                    result: output,
-                    is_error: false,
-                    preliminary: None,
-                    provider_metadata: None,
-                })
+                // Execute tool and catch errors
+                match tool.execute(input, &context).await {
+                    Ok(output) => Ok(ToolResultPart {
+                        tool_call_id,
+                        tool_name,
+                        result: output,
+                        is_error: false,
+                        preliminary: None,
+                        provider_metadata: None,
+                    }),
+                    Err(error) => {
+                        // Return error result instead of propagating
+                        Ok(ToolResultPart {
+                            tool_call_id,
+                            tool_name,
+                            result: JsonValue::String(error.to_string()),
+                            is_error: true,
+                            preliminary: None,
+                            provider_metadata: None,
+                        })
+                    }
+                }
             };
 
             futures.push(future);
@@ -188,6 +220,8 @@ mod tests {
         let results = executor.execute_tools(vec![tool_call]).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].tool_call_id, "call_123");
+        assert_eq!(results[0].tool_name, "test");
+        assert!(!results[0].is_error);
     }
 
     #[tokio::test]
