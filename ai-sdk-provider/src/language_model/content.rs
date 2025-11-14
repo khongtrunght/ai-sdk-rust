@@ -118,6 +118,8 @@ pub struct ToolCallPart {
 pub struct ToolResultPart {
     /// Identifier of the tool call this result is for
     pub tool_call_id: String,
+    /// Name of the tool that generated this result
+    pub tool_name: String,
     /// Result data from the tool execution
     pub result: JsonValue,
 
@@ -197,6 +199,7 @@ mod tests {
     fn test_tool_result_is_error_default() {
         let result = ToolResultPart {
             tool_call_id: "call-123".into(),
+            tool_name: "test_tool".into(),
             result: JsonValue::String("success".into()),
             is_error: false,
             preliminary: None,
@@ -205,12 +208,14 @@ mod tests {
         let json = serde_json::to_value(&result).unwrap();
         // is_error should not be serialized when false
         assert!(json.get("isError").is_none());
+        assert_eq!(json["toolName"], "test_tool");
     }
 
     #[test]
     fn test_tool_result_is_error_true() {
         let result = ToolResultPart {
             tool_call_id: "call-123".into(),
+            tool_name: "test_tool".into(),
             result: JsonValue::String("error".into()),
             is_error: true,
             preliminary: None,
@@ -218,5 +223,6 @@ mod tests {
         };
         let json = serde_json::to_value(&result).unwrap();
         assert_eq!(json["isError"], true);
+        assert_eq!(json["toolName"], "test_tool");
     }
 }

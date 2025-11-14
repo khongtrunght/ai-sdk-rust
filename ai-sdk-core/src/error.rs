@@ -22,6 +22,10 @@ pub enum GenerateTextError {
     /// Maximum steps reached without completion
     #[error("Maximum steps reached without completion")]
     MaxStepsReached,
+
+    /// Invalid parameters provided
+    #[error("Invalid parameters: {0}")]
+    InvalidParameters(String),
 }
 
 /// Error that can occur during streaming text generation

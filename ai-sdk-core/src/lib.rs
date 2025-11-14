@@ -98,6 +98,9 @@ pub mod util;
 /// Generate structured objects with schema validation
 pub mod generate_object;
 
+/// Agent framework for autonomous tool-using agents
+pub mod agent;
+
 // Re-export commonly used types from ai-sdk-provider
 pub use ai_sdk_provider::language_model::{
     CallOptions, Content, FinishReason, LanguageModel, Message, ToolCallPart, ToolResultPart, Usage,
