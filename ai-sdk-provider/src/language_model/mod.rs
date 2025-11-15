@@ -14,6 +14,8 @@ pub mod prompt;
 pub mod response_metadata;
 /// Streaming types for language model generation
 pub mod stream;
+/// Tool result output types for structured tool responses
+pub mod tool_result_output;
 /// Tool calling types for function calling
 pub mod tools;
 /// Language model trait definition
@@ -31,6 +33,7 @@ pub use finish_reason::FinishReason;
 pub use prompt::{AssistantContentPart, FileData, Message, Prompt, UserContentPart};
 pub use response_metadata::ResponseMetadata;
 pub use stream::{CallWarning, StreamPart};
+pub use tool_result_output::{ContentPart, ToolResultOutput};
 pub use tools::{FunctionTool, ProviderDefinedTool, Tool, ToolChoice};
 pub use trait_def::{
     GenerateResponse, LanguageModel, RequestInfo, ResponseInfo, StreamError, StreamResponse,

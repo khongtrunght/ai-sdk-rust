@@ -32,3 +32,7 @@ base64 = "0.22"
 
 [dev-dependencies]
 tokio-test = "0.4"
+
+[[example]]
+name = "structured_tool_output"
+path = "examples/structured_tool_output.rs"

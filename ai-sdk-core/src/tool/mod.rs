@@ -1,5 +1,9 @@
+mod tool_output;
+
 use crate::error::ToolError;
-use ai_sdk_provider::language_model::{FunctionTool, Message, ToolCallPart, ToolResultPart};
+use ai_sdk_provider::language_model::{
+    FunctionTool, Message, ToolCallPart, ToolResultOutput, ToolResultPart,
+};
 use ai_sdk_provider::JsonValue;
 use async_trait::async_trait;
 use serde_json::Value;
@@ -32,6 +36,22 @@ pub trait Tool: Send + Sync {
     fn needs_approval(&self, _input: &Value) -> bool {
         false
     }
+
+    /// Custom output formatting (optional)
+    /// If not implemented, uses default conversion (string → text, object → json)
+    fn to_model_output(&self, output: JsonValue) -> ToolResultOutput {
+        // Default implementation
+        match output {
+            JsonValue::String(s) => ToolResultOutput::Text {
+                value: s,
+                provider_metadata: None,
+            },
+            other => ToolResultOutput::Json {
+                value: other,
+                provider_metadata: None,
+            },
+        }
+    }
 }
 
 /// Executor that manages tool execution
@@ -59,22 +79,33 @@ impl ToolExecutor {
     }
 
     /// Execute multiple tool calls in parallel
-    pub async fn execute_tools(
-        &self,
-        tool_calls: Vec<ToolCallPart>,
-    ) -> Result<Vec<ToolResultPart>, ToolError> {
+    pub async fn execute_tools(&self, tool_calls: Vec<ToolCallPart>) -> Vec<ToolResultPart> {
         let mut futures = Vec::new();
 
         for tool_call in tool_calls {
-            let tool = self
-                .find_tool(&tool_call.tool_name)
-                .ok_or_else(|| ToolError::not_found(&tool_call.tool_name))?;
-
+            let tool_opt = self.find_tool(&tool_call.tool_name);
             let tool_call_id = tool_call.tool_call_id.clone();
             let tool_name = tool_call.tool_name.clone();
             let input_str = tool_call.input.clone();
 
             let future = async move {
+                // Handle tool not found
+                let tool = match tool_opt {
+                    Some(t) => t,
+                    None => {
+                        return ToolResultPart {
+                            tool_call_id,
+                            tool_name: tool_name.clone(),
+                            output: ToolResultOutput::ErrorText {
+                                value: format!("Tool '{}' not found", tool_name),
+                                provider_metadata: None,
+                            },
+                            preliminary: None,
+                            provider_metadata: None,
+                        };
+                    }
+                };
+
                 let context = ToolContext {
                     tool_call_id: tool_call_id.clone(),
                     messages: vec![], // TODO: pass actual messages
@@ -85,51 +116,55 @@ impl ToolExecutor {
                     Ok(v) => v,
                     Err(e) => {
                         // Return error result instead of propagating
-                        return Ok(ToolResultPart {
+                        return ToolResultPart {
                             tool_call_id,
                             tool_name,
-                            result: JsonValue::String(format!("Failed to parse input: {}", e)),
-                            is_error: true,
+                            output: ToolResultOutput::ErrorText {
+                                value: format!("Invalid input: {}", e),
+                                provider_metadata: None,
+                            },
                             preliminary: None,
                             provider_metadata: None,
-                        });
+                        };
                     }
                 };
 
                 // Check approval
                 if tool.needs_approval(&input) {
-                    // Return denial result instead of error
-                    return Ok(ToolResultPart {
+                    // Return denial result
+                    return ToolResultPart {
                         tool_call_id,
                         tool_name,
-                        result: JsonValue::String("Execution denied by user".to_string()),
-                        is_error: true,
+                        output: ToolResultOutput::ExecutionDenied {
+                            reason: Some("Execution denied by user".to_string()),
+                            provider_metadata: None,
+                        },
                         preliminary: None,
                         provider_metadata: None,
-                    });
+                    };
                 }
 
-                // Execute tool and catch errors
-                match tool.execute(input, &context).await {
-                    Ok(output) => Ok(ToolResultPart {
-                        tool_call_id,
-                        tool_name,
-                        result: output,
-                        is_error: false,
-                        preliminary: None,
-                        provider_metadata: None,
-                    }),
-                    Err(error) => {
-                        // Return error result instead of propagating
-                        Ok(ToolResultPart {
-                            tool_call_id,
-                            tool_name,
-                            result: JsonValue::String(error.to_string()),
-                            is_error: true,
-                            preliminary: None,
-                            provider_metadata: None,
-                        })
+                // Execute tool and convert to structured output
+                let output = match tool.execute(input, &context).await {
+                    Ok(raw_output) => {
+                        // Success - convert to structured output
+                        tool.to_model_output(raw_output)
                     }
+                    Err(error) => {
+                        // Execution error - return error output
+                        ToolResultOutput::ErrorText {
+                            value: error.to_string(),
+                            provider_metadata: None,
+                        }
+                    }
+                };
+
+                ToolResultPart {
+                    tool_call_id,
+                    tool_name,
+                    output,
+                    preliminary: None,
+                    provider_metadata: None,
                 }
             };
 
@@ -137,8 +172,7 @@ impl ToolExecutor {
         }
 
         // Execute all tools in parallel
-        let results = futures::future::try_join_all(futures).await?;
-        Ok(results)
+        futures::future::join_all(futures).await
     }
 
     /// Find a tool by name
@@ -217,11 +251,18 @@ mod tests {
             provider_metadata: None,
         };
 
-        let results = executor.execute_tools(vec![tool_call]).await.unwrap();
+        let results = executor.execute_tools(vec![tool_call]).await;
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].tool_call_id, "call_123");
         assert_eq!(results[0].tool_name, "test");
-        assert!(!results[0].is_error);
+
+        // Check that output is Text variant
+        match &results[0].output {
+            ToolResultOutput::Text { value, .. } => {
+                assert_eq!(value, "success");
+            }
+            _ => panic!("Expected Text output variant"),
+        }
     }
 
     #[tokio::test]
@@ -237,7 +278,15 @@ mod tests {
             provider_metadata: None,
         };
 
-        let result = executor.execute_tools(vec![tool_call]).await;
-        assert!(matches!(result, Err(ToolError::ToolNotFound(_))));
+        let results = executor.execute_tools(vec![tool_call]).await;
+        assert_eq!(results.len(), 1);
+
+        // Check that output is ErrorText variant
+        match &results[0].output {
+            ToolResultOutput::ErrorText { value, .. } => {
+                assert!(value.contains("not found"));
+            }
+            _ => panic!("Expected ErrorText output variant"),
+        }
     }
 }

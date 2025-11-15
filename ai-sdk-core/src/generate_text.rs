@@ -161,7 +161,7 @@ impl GenerateTextBuilder {
             }
 
             // Execute tools
-            let tool_results = tool_executor.execute_tools(tool_calls).await?;
+            let tool_results = tool_executor.execute_tools(tool_calls).await;
 
             // Append assistant message with tool calls
             messages.push(Message::Assistant {

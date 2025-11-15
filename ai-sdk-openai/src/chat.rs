@@ -169,7 +169,7 @@ impl OpenAIChatModel {
                         openai_messages.push(crate::api_types::ChatMessage {
                             role: "tool".into(),
                             content: Some(crate::api_types::ChatMessageContent::Text(
-                                serde_json::to_string(&tool_result.result).unwrap_or_default(),
+                                serde_json::to_string(&tool_result.output).unwrap_or_default(),
                             )),
                             tool_calls: None,
                             tool_call_id: Some(tool_result.tool_call_id.clone()),

@@ -271,13 +271,7 @@ fn create_multi_step_stream(
             }
 
             // Execute tools
-            let tool_results = match tool_executor.execute_tools(tool_calls.clone()).await {
-                Ok(results) => results,
-                Err(e) => {
-                    yield Err(StreamTextError::ToolError(e));
-                    return;
-                }
-            };
+            let tool_results = tool_executor.execute_tools(tool_calls.clone()).await;
 
             // Emit tool results
             for result in &tool_results {
