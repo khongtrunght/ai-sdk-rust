@@ -16,7 +16,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-ai-sdk-provider.workspace = true
+ai-sdk-provider = { version = "0.1.2", path = "../ai-sdk-provider" }
 async-trait.workspace = true
 tokio = { workspace = true, features = ["full"] }
 tokio-stream.workspace = true

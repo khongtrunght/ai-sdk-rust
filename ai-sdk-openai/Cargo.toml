@@ -16,8 +16,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-ai-sdk-provider.workspace = true
-ai-sdk-core.workspace = true
+ai-sdk-provider = { version = "0.1.2", path = "../ai-sdk-provider" }
+ai-sdk-core = { version = "0.1.2", path = "../ai-sdk-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 async-trait = { workspace = true }
