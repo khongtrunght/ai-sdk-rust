@@ -31,5 +31,4 @@ reqwest.workspace = true
 base64 = "0.22"
 
 [dev-dependencies]
-ai-sdk-openai = { version = "0.1.2", path = "../ai-sdk-openai" }
 tokio-test = "0.4"
