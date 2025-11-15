@@ -6,7 +6,6 @@ version = 4
 name = "ai-sdk-core"
 version = "0.1.2"
 dependencies = [
- "ai-sdk-openai",
  "ai-sdk-provider",
  "async-stream",
  "async-trait",

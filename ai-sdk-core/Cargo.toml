@@ -31,5 +31,4 @@ reqwest.workspace = true
 base64 = "0.22"
 
 [dev-dependencies]
-ai-sdk-openai.workspace = true
 tokio-test = "0.4"
