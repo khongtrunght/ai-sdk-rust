@@ -53,6 +53,8 @@ pub mod image_model;
 pub mod json_value;
 /// Language model interfaces and types for text generation and chat completion.
 pub mod language_model;
+/// Provider trait for AI model factories.
+pub mod provider;
 /// Reranking model interfaces and types for document reranking.
 pub mod reranking_model;
 /// Shared types and utilities used across all model types.
@@ -73,6 +75,7 @@ pub use language_model::{
     CallOptions, Content, FinishReason, GenerateResponse, LanguageModel, StreamPart,
     StreamResponse, Usage,
 };
+pub use provider::ProviderV3;
 pub use reranking_model::{
     Documents, RankingItem, RerankOptions, RerankResponse, RerankingModel,
     ResponseInfo as RerankingResponseInfo,

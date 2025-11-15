@@ -1,5 +1,18 @@
+use crate::error::ToolError;
 use ai_sdk_provider::language_model::ToolResultOutput;
 use ai_sdk_provider::JsonValue;
+use futures::stream::Stream;
+use std::pin::Pin;
+
+/// Tool execution output - either a single value or a stream of values
+pub enum ToolOutput {
+    /// Single final result
+    Value(JsonValue),
+
+    /// Stream of preliminary results, ending with final result
+    /// Each item in the stream represents a preliminary update
+    Stream(Pin<Box<dyn Stream<Item = Result<JsonValue, ToolError>> + Send>>),
+}
 
 /// Error mode for tool output conversion
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

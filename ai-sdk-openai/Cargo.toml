@@ -56,3 +56,7 @@ path = "examples/middleware_demo.rs"
 [[example]]
 name = "tool_loop_agent"
 path = "examples/tool_loop_agent.rs"
+
+[[example]]
+name = "multi_provider_registry"
+path = "examples/multi_provider_registry.rs"

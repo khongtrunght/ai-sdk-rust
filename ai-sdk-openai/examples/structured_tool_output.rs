@@ -1,4 +1,4 @@
-use ai_sdk_core::{Tool, ToolContext, ToolError, ToolExecutor};
+use ai_sdk_core::{Tool, ToolContext, ToolError, ToolExecutor, ToolOutput};
 use ai_sdk_provider::language_model::{ContentPart, ToolCallPart, ToolResultOutput};
 use ai_sdk_provider::JsonValue;
 use async_trait::async_trait;
@@ -28,9 +28,11 @@ impl Tool for SimpleTextTool {
         &self,
         _input: serde_json::Value,
         _ctx: &ToolContext,
-    ) -> Result<JsonValue, ToolError> {
+    ) -> Result<ToolOutput, ToolError> {
         // Return a simple string - will be converted to ToolResultOutput::Text
-        Ok(JsonValue::String("Hello, world!".to_string()))
+        Ok(ToolOutput::Value(JsonValue::String(
+            "Hello, world!".to_string(),
+        )))
     }
 }
 
@@ -60,9 +62,11 @@ impl Tool for ImageGenerationTool {
         &self,
         _input: serde_json::Value,
         _ctx: &ToolContext,
-    ) -> Result<JsonValue, ToolError> {
+    ) -> Result<ToolOutput, ToolError> {
         // Return a marker value - will be converted by custom to_model_output
-        Ok(JsonValue::String("image_generated".to_string()))
+        Ok(ToolOutput::Value(JsonValue::String(
+            "image_generated".to_string(),
+        )))
     }
 
     // Custom conversion: return text + image
@@ -110,7 +114,7 @@ impl Tool for DataFetchTool {
         &self,
         _input: serde_json::Value,
         _ctx: &ToolContext,
-    ) -> Result<JsonValue, ToolError> {
+    ) -> Result<ToolOutput, ToolError> {
         // Return structured data as JsonValue::Object
         use std::collections::HashMap;
         let mut map = HashMap::new();
@@ -124,7 +128,7 @@ impl Tool for DataFetchTool {
             JsonValue::Number(serde_json::Number::from(42)),
         );
 
-        Ok(JsonValue::Object(map))
+        Ok(ToolOutput::Value(JsonValue::Object(map)))
     }
 }
 

@@ -1,5 +1,7 @@
 mod tool_output;
 
+pub use tool_output::ToolOutput;
+
 use crate::error::ToolError;
 use ai_sdk_provider::language_model::{
     FunctionTool, Message, ToolCallPart, ToolResultOutput, ToolResultPart,
@@ -30,7 +32,8 @@ pub trait Tool: Send + Sync {
     fn input_schema(&self) -> Value;
 
     /// Execute the tool with given input
-    async fn execute(&self, input: Value, context: &ToolContext) -> Result<JsonValue, ToolError>;
+    /// Returns either a single value or a stream of preliminary results
+    async fn execute(&self, input: Value, context: &ToolContext) -> Result<ToolOutput, ToolError>;
 
     /// Check if this tool requires approval before execution
     fn needs_approval(&self, _input: &Value) -> bool {
@@ -146,9 +149,39 @@ impl ToolExecutor {
 
                 // Execute tool and convert to structured output
                 let output = match tool.execute(input, &context).await {
-                    Ok(raw_output) => {
-                        // Success - convert to structured output
-                        tool.to_model_output(raw_output)
+                    Ok(tool_output) => {
+                        // Handle both Value and Stream outputs
+                        match tool_output {
+                            ToolOutput::Value(raw_output) => {
+                                // Success - convert to structured output
+                                tool.to_model_output(raw_output)
+                            }
+                            ToolOutput::Stream(mut stream) => {
+                                // For non-streaming execute_tools, just get the last value
+                                use futures::stream::StreamExt;
+                                let mut last_output = None;
+                                while let Some(item) = stream.next().await {
+                                    match item {
+                                        Ok(output) => last_output = Some(output),
+                                        Err(e) => {
+                                            return ToolResultPart {
+                                                tool_call_id,
+                                                tool_name,
+                                                output: ToolResultOutput::ErrorText {
+                                                    value: e.to_string(),
+                                                    provider_metadata: None,
+                                                },
+                                                preliminary: None,
+                                                provider_metadata: None,
+                                            };
+                                        }
+                                    }
+                                }
+                                // Convert final output
+                                let final_value = last_output.unwrap_or(JsonValue::Null);
+                                tool.to_model_output(final_value)
+                            }
+                        }
                     }
                     Err(error) => {
                         // Execution error - return error output
@@ -173,6 +206,153 @@ impl ToolExecutor {
 
         // Execute all tools in parallel
         futures::future::join_all(futures).await
+    }
+
+    /// Execute a single tool and emit preliminary results via callback
+    ///
+    /// # Arguments
+    /// * `tool_call` - The tool call to execute
+    /// * `on_preliminary` - Callback invoked for each preliminary result
+    ///
+    /// # Returns
+    /// The final tool result after all preliminary results have been emitted
+    pub async fn execute_tool_with_stream<F>(
+        &self,
+        tool_call: ToolCallPart,
+        on_preliminary: F,
+    ) -> ToolResultPart
+    where
+        F: Fn(ToolResultPart) + Send,
+    {
+        let tool_call_id = tool_call.tool_call_id.clone();
+        let tool_name = tool_call.tool_name.clone();
+
+        // Find tool
+        let tool = match self.find_tool(&tool_call.tool_name) {
+            Some(t) => t,
+            None => {
+                return ToolResultPart {
+                    tool_call_id,
+                    tool_name: tool_name.clone(),
+                    output: ToolResultOutput::ErrorText {
+                        value: format!("Tool '{}' not found", tool_name),
+                        provider_metadata: None,
+                    },
+                    preliminary: None,
+                    provider_metadata: None,
+                };
+            }
+        };
+
+        let context = ToolContext {
+            tool_call_id: tool_call_id.clone(),
+            messages: vec![], // TODO: pass actual messages
+        };
+
+        // Parse input
+        let input: Value = match serde_json::from_str(&tool_call.input) {
+            Ok(v) => v,
+            Err(e) => {
+                return ToolResultPart {
+                    tool_call_id,
+                    tool_name,
+                    output: ToolResultOutput::ErrorText {
+                        value: format!("Invalid input: {}", e),
+                        provider_metadata: None,
+                    },
+                    preliminary: None,
+                    provider_metadata: None,
+                };
+            }
+        };
+
+        // Check approval
+        if tool.needs_approval(&input) {
+            return ToolResultPart {
+                tool_call_id,
+                tool_name,
+                output: ToolResultOutput::ExecutionDenied {
+                    reason: Some("Execution denied by user".to_string()),
+                    provider_metadata: None,
+                },
+                preliminary: None,
+                provider_metadata: None,
+            };
+        }
+
+        // Execute tool
+        match tool.execute(input, &context).await {
+            Ok(ToolOutput::Value(value)) => {
+                // Simple case: single result
+                let output = tool.to_model_output(value);
+                ToolResultPart {
+                    tool_call_id,
+                    tool_name,
+                    output,
+                    preliminary: None,
+                    provider_metadata: None,
+                }
+            }
+            Ok(ToolOutput::Stream(mut stream)) => {
+                use futures::stream::StreamExt;
+
+                let mut last_output = None;
+
+                // Process all stream items
+                while let Some(item) = stream.next().await {
+                    match item {
+                        Ok(output) => {
+                            // Emit preliminary result
+                            let structured = tool.to_model_output(output.clone());
+                            let preliminary_result = ToolResultPart {
+                                tool_call_id: tool_call_id.clone(),
+                                tool_name: tool_name.clone(),
+                                output: structured,
+                                preliminary: Some(true),
+                                provider_metadata: None,
+                            };
+
+                            on_preliminary(preliminary_result);
+                            last_output = Some(output);
+                        }
+                        Err(e) => {
+                            return ToolResultPart {
+                                tool_call_id,
+                                tool_name,
+                                output: ToolResultOutput::ErrorText {
+                                    value: e.to_string(),
+                                    provider_metadata: None,
+                                },
+                                preliminary: None,
+                                provider_metadata: None,
+                            };
+                        }
+                    }
+                }
+
+                // Return final result (last output without preliminary flag)
+                let final_value = last_output.unwrap_or(JsonValue::Null);
+                let final_output = tool.to_model_output(final_value);
+
+                ToolResultPart {
+                    tool_call_id,
+                    tool_name,
+                    output: final_output,
+                    preliminary: None, // Final result
+                    provider_metadata: None,
+                }
+            }
+            Err(error) => ToolResultPart {
+                tool_call_id,
+                tool_name,
+                output: ToolResultOutput::ErrorText {
+                    value: error.to_string(),
+                    provider_metadata: None,
+                },
+                preliminary: None,
+                provider_metadata: None,
+            },
+        }
     }
 
     /// Find a tool by name
@@ -216,8 +396,8 @@ mod tests {
             &self,
             _input: Value,
             _context: &ToolContext,
-        ) -> Result<JsonValue, ToolError> {
-            Ok(JsonValue::String(self.result.clone()))
+        ) -> Result<ToolOutput, ToolError> {
+            Ok(ToolOutput::Value(JsonValue::String(self.result.clone())))
         }
     }
 
