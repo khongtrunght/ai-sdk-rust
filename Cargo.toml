@@ -10,11 +10,6 @@ repository = "https://github.com/khongtrunght/ai-sdk-rust"
 rust-version = "1.70"
 
 [workspace.dependencies]
-# Workspace packages
-ai-sdk-provider = { version = "0.1.2", path = "ai-sdk-provider" }
-ai-sdk-core = { version = "0.1.2", path = "ai-sdk-core" }
-ai-sdk-openai = { version = "0.1.2", path = "ai-sdk-openai" }
-
 # Async runtime
 tokio = { version = "1.40", features = ["full"] }
 tokio-stream = "0.1"
