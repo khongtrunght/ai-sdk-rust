@@ -48,3 +48,11 @@ path = "examples/transcription_basic.rs"
 [[example]]
 name = "multimodal_chat"
 path = "examples/multimodal_chat.rs"
+
+[[example]]
+name = "middleware_demo"
+path = "examples/middleware_demo.rs"
+
+[[example]]
+name = "tool_loop_agent"
+path = "examples/tool_loop_agent.rs"
