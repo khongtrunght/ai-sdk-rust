@@ -71,7 +71,7 @@ pub struct ChatMessage {
     pub tool_call_id: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ChatCompletionResponse {
     #[allow(dead_code)]
     pub id: String,
@@ -85,18 +85,20 @@ pub struct ChatCompletionResponse {
     pub usage: Option<UsageInfo>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Choice {
     #[allow(dead_code)]
     pub index: u32,
     pub message: ChatMessage,
     pub finish_reason: Option<String>,
+    pub logprobs: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct UsageInfo {
     pub prompt_tokens: u32,
-    pub completion_tokens: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completion_tokens: Option<u32>,
     pub total_tokens: u32,
 }
 
