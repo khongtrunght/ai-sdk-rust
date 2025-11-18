@@ -1,15 +1,27 @@
+mod common;
+
 use ai_sdk_openai::OpenAIChatModel;
 use ai_sdk_provider::language_model::{FunctionTool, Message, Tool, ToolChoice, UserContentPart};
 use ai_sdk_provider::{CallOptions, Content, FinishReason, LanguageModel, StreamPart};
+use common::{load_chunks_fixture, load_json_fixture, TestServer};
 use futures::stream::StreamExt;
 
 #[tokio::test]
-#[ignore] // Requires OPENAI_API_KEY
-async fn test_tool_calling_non_streaming() {
-    let api_key =
-        std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable not set");
+async fn test_tool_calling_non_streaming_with_fixture() {
+    // Setup mock server
+    let test_server = TestServer::new().await;
 
-    let model = OpenAIChatModel::new("gpt-4", api_key);
+    // Load fixture
+    let fixture = load_json_fixture("chat-tool-calling-1");
+
+    // Configure mock to return fixture
+    test_server
+        .mock_json_response("/v1/chat/completions", fixture)
+        .await;
+
+    // Create model pointing to mock server
+    let model = OpenAIChatModel::new("gpt-4", "test-key")
+        .with_base_url(format!("{}/v1", test_server.base_url));
 
     let tool = Tool::Function(FunctionTool {
         name: "get_weather".to_string(),
@@ -68,26 +80,36 @@ async fn test_tool_calling_non_streaming() {
         .find(|c| matches!(c, Content::ToolCall(_)))
     {
         assert_eq!(tool_call.tool_name, "get_weather");
-        assert!(!tool_call.tool_call_id.is_empty());
+        assert_eq!(tool_call.tool_call_id, "call_abc123");
         assert!(!tool_call.input.is_empty());
 
-        // Parse the input to verify it contains location
-        let input: serde_json::Value =
-            serde_json::from_str(&tool_call.input).expect("Tool input should be valid JSON");
-        assert!(
-            input.get("location").is_some(),
-            "Tool input should contain location"
-        );
+        // Snapshot the tool call
+        insta::assert_json_snapshot!(tool_call, @r#"
+        {
+          "toolCallId": "call_abc123",
+          "toolName": "get_weather",
+          "input": "{\"location\":\"Tokyo\"}"
+        }
+        "#);
     }
 }
 
 #[tokio::test]
-#[ignore] // Requires OPENAI_API_KEY
-async fn test_tool_calling_streaming() {
-    let api_key =
-        std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable not set");
+async fn test_tool_calling_streaming_with_fixture() {
+    // Setup mock server
+    let test_server = TestServer::new().await;
 
-    let model = OpenAIChatModel::new("gpt-4", api_key);
+    // Load streaming chunks
+    let chunks = load_chunks_fixture("chat-tool-calling-calculate-1");
+
+    // Configure mock to return streaming response
+    test_server
+        .mock_streaming_response("/v1/chat/completions", chunks)
+        .await;
+
+    // Create model pointing to mock server
+    let model = OpenAIChatModel::new("gpt-4", "test-key")
+        .with_base_url(format!("{}/v1", test_server.base_url));
 
     let tool = Tool::Function(FunctionTool {
         name: "calculate".to_string(),
@@ -165,12 +187,21 @@ async fn test_tool_calling_streaming() {
 }
 
 #[tokio::test]
-#[ignore] // Requires OPENAI_API_KEY
-async fn test_multiple_tools() {
-    let api_key =
-        std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable not set");
+async fn test_multiple_tools_with_fixture() {
+    // Setup mock server
+    let test_server = TestServer::new().await;
 
-    let model = OpenAIChatModel::new("gpt-4", api_key);
+    // Load fixture with multiple tool calls
+    let fixture = load_json_fixture("chat-multiple-tools-1");
+
+    // Configure mock to return fixture
+    test_server
+        .mock_json_response("/v1/chat/completions", fixture)
+        .await;
+
+    // Create model pointing to mock server
+    let model = OpenAIChatModel::new("gpt-4", "test-key")
+        .with_base_url(format!("{}/v1", test_server.base_url));
 
     let weather_tool = Tool::Function(FunctionTool {
         name: "get_weather".to_string(),
@@ -214,7 +245,7 @@ async fn test_multiple_tools() {
         .await
         .expect("Failed to generate response");
 
-    // Should contain at least one tool call
+    // Should contain multiple tool calls
     let tool_calls: Vec<_> = response
         .content
         .iter()
@@ -224,19 +255,50 @@ async fn test_multiple_tools() {
         })
         .collect();
 
-    assert!(
-        !tool_calls.is_empty(),
-        "Response should contain at least one tool call"
+    assert_eq!(
+        tool_calls.len(),
+        2,
+        "Response should contain exactly 2 tool calls"
     );
+
+    // Verify tool names
+    let tool_names: Vec<&str> = tool_calls.iter().map(|tc| tc.tool_name.as_str()).collect();
+    assert!(tool_names.contains(&"get_weather"));
+    assert!(tool_names.contains(&"get_time"));
+
+    // Snapshot the tool calls
+    insta::assert_json_snapshot!(tool_calls, @r#"
+    [
+      {
+        "toolCallId": "call_weather123",
+        "toolName": "get_weather",
+        "input": "{\"location\":\"Paris\"}"
+      },
+      {
+        "toolCallId": "call_time123",
+        "toolName": "get_time",
+        "input": "{\"location\":\"Paris\"}"
+      }
+    ]
+    "#);
 }
 
 #[tokio::test]
-#[ignore] // Requires OPENAI_API_KEY
-async fn test_no_tool_calls_when_not_needed() {
-    let api_key =
-        std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable not set");
+async fn test_no_tool_calls_when_not_needed_with_fixture() {
+    // Setup mock server
+    let test_server = TestServer::new().await;
 
-    let model = OpenAIChatModel::new("gpt-4", api_key);
+    // Load fixture with no tool calls (regular text response)
+    let fixture = load_json_fixture("chat-no-tool-call-1");
+
+    // Configure mock to return fixture
+    test_server
+        .mock_json_response("/v1/chat/completions", fixture)
+        .await;
+
+    // Create model pointing to mock server
+    let model = OpenAIChatModel::new("gpt-4", "test-key")
+        .with_base_url(format!("{}/v1", test_server.base_url));
 
     let tool = Tool::Function(FunctionTool {
         name: "get_weather".to_string(),
@@ -283,4 +345,12 @@ async fn test_no_tool_calls_when_not_needed() {
         FinishReason::Stop,
         "Finish reason should be Stop"
     );
+
+    // Verify we got a text response
+    if let Some(Content::Text(text)) = response.content.first() {
+        assert!(!text.text.is_empty());
+        assert!(text.text.contains("Hello") || text.text.contains("well"));
+    } else {
+        panic!("Expected text content in response");
+    }
 }

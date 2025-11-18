@@ -1,0 +1,8 @@
+{"id":"chatcmpl-calc123","object":"chat.completion.chunk","created":1699999999,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":null,"tool_calls":[{"index":0,"id":"call_calc123","type":"function","function":{"name":"calculate","arguments":""}}]},"finish_reason":null}]}
+{"id":"chatcmpl-calc123","object":"chat.completion.chunk","created":1699999999,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"ex"}}]},"finish_reason":null}]}
+{"id":"chatcmpl-calc123","object":"chat.completion.chunk","created":1699999999,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"pres"}}]},"finish_reason":null}]}
+{"id":"chatcmpl-calc123","object":"chat.completion.chunk","created":1699999999,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"sion"}}]},"finish_reason":null}]}
+{"id":"chatcmpl-calc123","object":"chat.completion.chunk","created":1699999999,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\":\"1"}}]},"finish_reason":null}]}
+{"id":"chatcmpl-calc123","object":"chat.completion.chunk","created":1699999999,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"5 * "}}]},"finish_reason":null}]}
+{"id":"chatcmpl-calc123","object":"chat.completion.chunk","created":1699999999,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"7\"}"}}]},"finish_reason":null}]}
+{"id":"chatcmpl-calc123","object":"chat.completion.chunk","created":1699999999,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}

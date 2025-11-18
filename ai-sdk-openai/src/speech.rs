@@ -23,6 +23,24 @@ impl OpenAISpeechModel {
             base_url: "https://api.openai.com/v1".into(),
         }
     }
+
+    /// Configures a custom base URL for the API endpoint.
+    ///
+    /// This is primarily useful for testing with mock servers.
+    ///
+    /// # Arguments
+    /// * `base_url` - Custom base URL (e.g., "http://localhost:8080")
+    ///
+    /// # Example
+    /// ```rust
+    /// # use ai_sdk_openai::OpenAISpeechModel;
+    /// let model = OpenAISpeechModel::new("tts-1", "api-key")
+    ///     .with_base_url("http://localhost:8080");
+    /// ```
+    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.base_url = base_url.into();
+        self
+    }
 }
 
 #[derive(Serialize)]

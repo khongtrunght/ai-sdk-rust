@@ -23,6 +23,24 @@ impl OpenAIImageModel {
         }
     }
 
+    /// Configures a custom base URL for the API endpoint.
+    ///
+    /// This is primarily useful for testing with mock servers.
+    ///
+    /// # Arguments
+    /// * `base_url` - Custom base URL (e.g., "http://localhost:8080")
+    ///
+    /// # Example
+    /// ```rust
+    /// # use ai_sdk_openai::OpenAIImageModel;
+    /// let model = OpenAIImageModel::new("dall-e-3", "api-key")
+    ///     .with_base_url("http://localhost:8080");
+    /// ```
+    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.base_url = base_url.into();
+        self
+    }
+
     /// Check if this model has a default response format
     fn has_default_response_format(&self) -> bool {
         matches!(self.model_id.as_str(), "gpt-image-1" | "gpt-image-1-mini")

@@ -29,6 +29,13 @@ reqwest = { workspace = true }
 thiserror = { workspace = true }
 base64 = "0.22"
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+wiremock = "0.6"
+insta = { version = "1.43", features = ["json", "yaml"] }
+serde_json = { workspace = true }
+tokio-stream = { workspace = true }
+
 [[example]]
 name = "openai_basic"
 path = "examples/openai_basic.rs"

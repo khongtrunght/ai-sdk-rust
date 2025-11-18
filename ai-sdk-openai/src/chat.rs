@@ -27,6 +27,24 @@ impl OpenAIChatModel {
         }
     }
 
+    /// Configures a custom base URL for the API endpoint.
+    ///
+    /// This is primarily useful for testing with mock servers.
+    ///
+    /// # Arguments
+    /// * `base_url` - Custom base URL (e.g., "http://localhost:8080")
+    ///
+    /// # Example
+    /// ```rust
+    /// # use ai_sdk_openai::OpenAIChatModel;
+    /// let model = OpenAIChatModel::new("gpt-4", "api-key")
+    ///     .with_base_url("http://localhost:8080");
+    /// ```
+    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.base_url = base_url.into();
+        self
+    }
+
     fn convert_prompt_to_messages(&self, prompt: &[Message]) -> Vec<crate::api_types::ChatMessage> {
         // Convert our prompt format to OpenAI's message format
         let mut openai_messages = Vec::new();
