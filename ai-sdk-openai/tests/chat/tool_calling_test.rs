@@ -1,9 +1,7 @@
-mod common;
-
+use crate::common::{load_chunks_fixture, load_json_fixture, TestServer};
 use ai_sdk_openai::OpenAIChatModel;
 use ai_sdk_provider::language_model::{FunctionTool, Message, Tool, ToolChoice, UserContentPart};
 use ai_sdk_provider::{CallOptions, Content, FinishReason, LanguageModel, StreamPart};
-use common::{load_chunks_fixture, load_json_fixture, TestServer};
 use futures::stream::StreamExt;
 
 #[tokio::test]

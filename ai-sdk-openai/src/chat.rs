@@ -1,5 +1,6 @@
 use ai_sdk_provider::language_model::{
-    AssistantContentPart, Message, StreamError, TextPart, ToolCallPart, UserContentPart,
+    AssistantContentPart, Message, ResponseInfo, StreamError, TextPart, ToolCallPart,
+    UserContentPart,
 };
 use ai_sdk_provider::*;
 use async_stream::stream;
@@ -339,6 +340,13 @@ impl LanguageModel for OpenAIChatModel {
             }));
         }
 
+        // Capture headers before consuming response
+        let headers: HashMap<String, String> = response
+            .headers()
+            .iter()
+            .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
+            .collect();
+
         let api_response: crate::api_types::ChatCompletionResponse = response.json().await?;
 
         let choice = &api_response.choices[0];
@@ -393,7 +401,7 @@ impl LanguageModel for OpenAIChatModel {
             .as_ref()
             .map(|u| Usage {
                 input_tokens: Some(u.prompt_tokens),
-                output_tokens: Some(u.completion_tokens),
+                output_tokens: u.completion_tokens,
                 total_tokens: Some(u.total_tokens),
                 reasoning_tokens: None,
                 cached_input_tokens: None,
@@ -407,13 +415,50 @@ impl LanguageModel for OpenAIChatModel {
             self.map_finish_reason(choice.finish_reason.as_deref())
         };
 
+        // Build provider metadata with logprobs if present
+        let provider_metadata = if let Some(logprobs) = &choice.logprobs {
+            if let Some(content_logprobs) = logprobs.get("content") {
+                let mut metadata = HashMap::new();
+                let mut openai_metadata = HashMap::new();
+
+                // Convert from serde_json::Value to JsonValue
+                let json_value: ai_sdk_provider::json_value::JsonValue =
+                    serde_json::from_value(content_logprobs.clone())
+                        .unwrap_or(ai_sdk_provider::json_value::JsonValue::Null);
+
+                openai_metadata.insert("logprobs".to_string(), json_value);
+                metadata.insert("openai".to_string(), openai_metadata);
+                Some(metadata)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Build response info
+        let response_info = Some(ResponseInfo {
+            headers: Some(headers),
+            body: Some(serde_json::to_value(&api_response).unwrap_or(serde_json::json!({}))),
+            id: Some(api_response.id.clone()),
+            timestamp: Some({
+                // Convert Unix timestamp to ISO 8601
+                let secs = api_response.created as i64;
+                let hours = secs / 3600;
+                let minutes = (secs % 3600) / 60;
+                let seconds = secs % 60;
+                format!("1970-01-01T{:02}:{:02}:{:02}Z", hours, minutes, seconds)
+            }),
+            model_id: Some(api_response.model.clone()),
+        });
+
         Ok(GenerateResponse {
             content,
             finish_reason,
             usage,
-            provider_metadata: None,
+            provider_metadata,
             request: None,
-            response: None,
+            response: response_info,
             warnings: vec![],
         })
     }
@@ -487,7 +532,7 @@ impl LanguageModel for OpenAIChatModel {
                                     if let Some(usage_info) = &chunk.usage {
                                         accumulated_usage = Some(Usage {
                                             input_tokens: Some(usage_info.prompt_tokens),
-                                            output_tokens: Some(usage_info.completion_tokens),
+                                            output_tokens: usage_info.completion_tokens,
                                             total_tokens: Some(usage_info.total_tokens),
                                             reasoning_tokens: None,
                                             cached_input_tokens: None,
