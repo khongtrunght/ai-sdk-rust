@@ -284,6 +284,130 @@ impl OpenAIChatModel {
             _ => FinishReason::Unknown,
         }
     }
+
+    /// Extract OpenAI-specific options from provider_options
+    fn extract_openai_options(
+        &self,
+        provider_options: &Option<std::collections::HashMap<String, json_value::JsonObject>>,
+    ) -> OpenAIOptions {
+        use json_value::JsonValue;
+
+        let mut opts = OpenAIOptions::default();
+
+        if let Some(provider_opts) = provider_options {
+            if let Some(openai_opts) = provider_opts.get("openai") {
+                // logitBias: HashMap<String, f64>
+                if let Some(JsonValue::Object(logit_bias)) = openai_opts.get("logitBias") {
+                    let mut bias_map = HashMap::new();
+                    for (k, v) in logit_bias {
+                        if let JsonValue::Number(n) = v {
+                            if let Some(f) = n.as_f64() {
+                                bias_map.insert(k.clone(), f);
+                            }
+                        }
+                    }
+                    if !bias_map.is_empty() {
+                        opts.logit_bias = Some(bias_map);
+                    }
+                }
+
+                // logprobs: bool
+                if let Some(JsonValue::Bool(b)) = openai_opts.get("logprobs") {
+                    opts.logprobs = Some(*b);
+                }
+
+                // parallelToolCalls: bool
+                if let Some(JsonValue::Bool(b)) = openai_opts.get("parallelToolCalls") {
+                    opts.parallel_tool_calls = Some(*b);
+                }
+
+                // user: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("user") {
+                    opts.user = Some(s.clone());
+                }
+
+                // reasoningEffort: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("reasoningEffort") {
+                    opts.reasoning_effort = Some(s.clone());
+                }
+
+                // maxCompletionTokens: u32
+                if let Some(JsonValue::Number(n)) = openai_opts.get("maxCompletionTokens") {
+                    if let Some(u) = n.as_u64() {
+                        opts.max_completion_tokens = Some(u as u32);
+                    }
+                }
+
+                // store: bool
+                if let Some(JsonValue::Bool(b)) = openai_opts.get("store") {
+                    opts.store = Some(*b);
+                }
+
+                // metadata: HashMap<String, String>
+                if let Some(JsonValue::Object(metadata)) = openai_opts.get("metadata") {
+                    let mut meta_map = HashMap::new();
+                    for (k, v) in metadata {
+                        if let JsonValue::String(s) = v {
+                            meta_map.insert(k.clone(), s.clone());
+                        }
+                    }
+                    if !meta_map.is_empty() {
+                        opts.metadata = Some(meta_map);
+                    }
+                }
+
+                // prediction: JsonValue
+                if let Some(v) = openai_opts.get("prediction") {
+                    // Convert JsonValue to serde_json::Value
+                    if let Ok(json_str) = serde_json::to_string(v) {
+                        if let Ok(json_val) = serde_json::from_str(&json_str) {
+                            opts.prediction = Some(json_val);
+                        }
+                    }
+                }
+
+                // serviceTier: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("serviceTier") {
+                    opts.service_tier = Some(s.clone());
+                }
+
+                // textVerbosity: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("textVerbosity") {
+                    opts.verbosity = Some(s.clone());
+                }
+
+                // promptCacheKey: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("promptCacheKey") {
+                    opts.prompt_cache_key = Some(s.clone());
+                }
+
+                // safetyIdentifier: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("safetyIdentifier") {
+                    opts.safety_identifier = Some(s.clone());
+                }
+            }
+        }
+
+        opts
+    }
+}
+
+/// Struct to hold extracted OpenAI options
+#[derive(Default)]
+struct OpenAIOptions {
+    logit_bias: Option<HashMap<String, f64>>,
+    logprobs: Option<bool>,
+    parallel_tool_calls: Option<bool>,
+    user: Option<String>,
+    reasoning_effort: Option<String>,
+    max_completion_tokens: Option<u32>,
+    store: Option<bool>,
+    metadata: Option<HashMap<String, String>>,
+    prediction: Option<serde_json::Value>,
+    service_tier: Option<String>,
+    verbosity: Option<String>,
+    prompt_cache_key: Option<String>,
+    safety_identifier: Option<String>,
 }
 
 #[async_trait]
@@ -306,6 +430,9 @@ impl LanguageModel for OpenAIChatModel {
         &self,
         options: CallOptions,
     ) -> Result<GenerateResponse, Box<dyn std::error::Error + Send + Sync>> {
+        // Extract OpenAI-specific options
+        let openai_opts = self.extract_openai_options(&options.provider_options);
+
         let request = crate::api_types::ChatCompletionRequest {
             model: self.model_id.clone(),
             messages: self.convert_prompt_to_messages(&options.prompt),
@@ -322,16 +449,40 @@ impl LanguageModel for OpenAIChatModel {
                 .as_ref()
                 .map(|rf| self.convert_response_format(rf)),
             stream_options: None, // Not needed for non-streaming
+
+            // OpenAI-specific options
+            logit_bias: openai_opts.logit_bias,
+            logprobs: openai_opts.logprobs,
+            top_logprobs: None, // TODO: Extract from logprobs if it's a number
+            user: openai_opts.user,
+            parallel_tool_calls: openai_opts.parallel_tool_calls,
+            reasoning_effort: openai_opts.reasoning_effort,
+            max_completion_tokens: openai_opts.max_completion_tokens,
+            store: openai_opts.store,
+            metadata: openai_opts.metadata,
+            prediction: openai_opts.prediction,
+            service_tier: openai_opts.service_tier,
+            verbosity: openai_opts.verbosity,
+            prompt_cache_key: openai_opts.prompt_cache_key,
+            safety_identifier: openai_opts.safety_identifier,
         };
 
-        let response = self
+        // Build request with custom headers
+        let mut request_builder = self
             .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await?;
+            .json(&request);
+
+        // Add custom headers if provided
+        if let Some(headers) = &options.headers {
+            for (key, value) in headers {
+                request_builder = request_builder.header(key, value);
+            }
+        }
+
+        let response = request_builder.send().await?;
 
         if !response.status().is_success() {
             return Err(Box::new(crate::error::OpenAIError::ApiError {
@@ -467,6 +618,9 @@ impl LanguageModel for OpenAIChatModel {
         &self,
         options: CallOptions,
     ) -> Result<StreamResponse, Box<dyn std::error::Error + Send + Sync + 'static>> {
+        // Extract OpenAI-specific options
+        let openai_opts = self.extract_openai_options(&options.provider_options);
+
         let request = crate::api_types::ChatCompletionRequest {
             model: self.model_id.clone(),
             messages: self.convert_prompt_to_messages(&options.prompt),
@@ -485,16 +639,40 @@ impl LanguageModel for OpenAIChatModel {
             stream_options: Some(crate::api_types::StreamOptions {
                 include_usage: true,
             }),
+
+            // OpenAI-specific options
+            logit_bias: openai_opts.logit_bias,
+            logprobs: openai_opts.logprobs,
+            top_logprobs: None,
+            user: openai_opts.user,
+            parallel_tool_calls: openai_opts.parallel_tool_calls,
+            reasoning_effort: openai_opts.reasoning_effort,
+            max_completion_tokens: openai_opts.max_completion_tokens,
+            store: openai_opts.store,
+            metadata: openai_opts.metadata,
+            prediction: openai_opts.prediction,
+            service_tier: openai_opts.service_tier,
+            verbosity: openai_opts.verbosity,
+            prompt_cache_key: openai_opts.prompt_cache_key,
+            safety_identifier: openai_opts.safety_identifier,
         };
 
-        let response = self
+        // Build request with custom headers
+        let mut request_builder = self
             .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await?;
+            .json(&request);
+
+        // Add custom headers if provided
+        if let Some(headers) = &options.headers {
+            for (key, value) in headers {
+                request_builder = request_builder.header(key, value);
+            }
+        }
+
+        let response = request_builder.send().await?;
 
         let status = response.status();
         if !status.is_success() {
