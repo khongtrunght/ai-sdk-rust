@@ -7,7 +7,6 @@ use serde_json::json;
 // Phase 6: Advanced Features Tests
 
 #[tokio::test]
-#[ignore = "Requires annotations/citations parsing implementation - not yet implemented"]
 async fn test_parse_annotations_citations() {
     // TypeScript reference: line 687
     // Test that annotations/citations from response are parsed into source content
@@ -138,7 +137,6 @@ async fn test_cached_tokens_in_prompt_details() {
 }
 
 #[tokio::test]
-#[ignore = "Requires prediction tokens extraction from completion_tokens_details - not yet implemented"]
 async fn test_prediction_tokens_in_metadata() {
     // TypeScript reference: line 1189
     // Test that accepted/rejected prediction tokens are returned in provider metadata

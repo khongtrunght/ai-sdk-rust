@@ -91,6 +91,17 @@ pub enum ChatMessageContent {
     Parts(Vec<crate::multimodal::OpenAIContentPart>),
 }
 
+/// URL citation annotation from OpenAI API
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UrlCitationAnnotation {
+    #[serde(rename = "type")]
+    pub annotation_type: String, // "url_citation"
+    pub start_index: u32,
+    pub end_index: u32,
+    pub url: String,
+    pub title: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
     pub role: String,
@@ -100,6 +111,8 @@ pub struct ChatMessage {
     pub tool_calls: Option<Vec<OpenAIToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
+    #[serde(default)]
+    pub annotations: Option<Vec<UrlCitationAnnotation>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -125,12 +138,34 @@ pub struct Choice {
     pub logprobs: Option<serde_json::Value>,
 }
 
+/// Detailed completion token information
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CompletionTokensDetails {
+    #[serde(default)]
+    pub reasoning_tokens: Option<u32>,
+    #[serde(default)]
+    pub accepted_prediction_tokens: Option<u32>,
+    #[serde(default)]
+    pub rejected_prediction_tokens: Option<u32>,
+}
+
+/// Detailed prompt token information
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PromptTokensDetails {
+    #[serde(default)]
+    pub cached_tokens: Option<u32>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct UsageInfo {
     pub prompt_tokens: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completion_tokens: Option<u32>,
     pub total_tokens: u32,
+    #[serde(default)]
+    pub completion_tokens_details: Option<CompletionTokensDetails>,
+    #[serde(default)]
+    pub prompt_tokens_details: Option<PromptTokensDetails>,
 }
 
 // Streaming response types
@@ -162,6 +197,8 @@ pub struct StreamDelta {
     #[allow(dead_code)]
     pub role: Option<String>,
     pub tool_calls: Option<Vec<OpenAIToolCallDelta>>,
+    #[serde(default)]
+    pub annotations: Option<Vec<UrlCitationAnnotation>>,
 }
 
 // Tool-related types

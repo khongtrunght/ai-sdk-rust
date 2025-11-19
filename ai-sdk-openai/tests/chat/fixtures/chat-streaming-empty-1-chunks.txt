@@ -1,0 +1,3 @@
+{"id":"chatcmpl-empty","object":"chat.completion.chunk","created":1702657020,"model":"gpt-3.5-turbo","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+{"id":"chatcmpl-empty","object":"chat.completion.chunk","created":1702657020,"model":"gpt-3.5-turbo","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+{"id":"chatcmpl-empty","object":"chat.completion.chunk","created":1702657020,"model":"gpt-3.5-turbo","choices":[],"usage":{"prompt_tokens":10,"completion_tokens":0,"total_tokens":10}}

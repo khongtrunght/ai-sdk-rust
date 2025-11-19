@@ -300,21 +300,12 @@ async fn test_stream_with_provider_options() {
 }
 
 #[tokio::test]
-#[ignore = "Requires proper SSE format for inline chunks - use fixture files instead"]
 async fn test_stream_multiple_tool_calls() {
     // TypeScript reference: line 2340
     // Test streaming multiple tool calls in a single response
     let test_server = TestServer::new().await;
 
-    // Create streaming chunks for multiple tool calls
-    let chunks = vec![
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":null,"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}"#.to_string(),
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"location\":\"Tokyo\"}"}}]},"finish_reason":null}]}"#.to_string(),
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"id":"call_2","type":"function","function":{"name":"get_time","arguments":""}}]},"finish_reason":null}]}"#.to_string(),
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4","choices":[{"index":0,"delta":{"tool_calls":[{"index":1,"function":{"arguments":"{\"timezone\":\"JST\"}"}}]},"finish_reason":null}]}"#.to_string(),
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":20,"completion_tokens":30,"total_tokens":50}}"#.to_string(),
-    ];
-
+    let chunks = load_chunks_fixture("chat-streaming-multiple-tools-1");
     test_server
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
@@ -366,7 +357,6 @@ async fn test_stream_multiple_tool_calls() {
 }
 
 #[tokio::test]
-#[ignore = "Requires cached tokens extraction from streaming response - not yet fully implemented"]
 async fn test_stream_cached_tokens() {
     // TypeScript reference: line 2600
     // Test that cached tokens are included in streaming usage
@@ -413,7 +403,6 @@ async fn test_stream_cached_tokens() {
 }
 
 #[tokio::test]
-#[ignore = "Requires reasoning tokens extraction from streaming response - not yet fully implemented"]
 async fn test_stream_reasoning_tokens() {
     // TypeScript reference: line 2650
     // Test that reasoning tokens are included in streaming usage
@@ -533,20 +522,12 @@ async fn test_stream_with_max_tokens() {
 }
 
 #[tokio::test]
-#[ignore = "Requires annotations streaming implementation - not yet implemented"]
 async fn test_stream_annotations() {
     // TypeScript reference: line 1918
     // Test streaming annotations/citations
     let test_server = TestServer::new().await;
 
-    // Create streaming response with annotations
-    let chunks = vec![
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4o-search-preview","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}"#.to_string(),
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4o-search-preview","choices":[{"index":0,"delta":{"content":"Based on search results"},"finish_reason":null}]}"#.to_string(),
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4o-search-preview","choices":[{"index":0,"delta":{"annotations":[{"type":"url_citation","start_index":24,"end_index":29,"url":"https://example.com/doc1.pdf","title":"Document 1"}]},"finish_reason":null}]}"#.to_string(),
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4o-search-preview","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":17,"completion_tokens":10,"total_tokens":27}}"#.to_string(),
-    ];
-
+    let chunks = load_chunks_fixture("chat-streaming-annotations-1");
     test_server
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
@@ -581,16 +562,11 @@ async fn test_stream_annotations() {
 }
 
 #[tokio::test]
-#[ignore = "Requires proper SSE format for inline chunks - use fixture files instead"]
 async fn test_stream_empty_response() {
     // Test handling of empty streaming response
     let test_server = TestServer::new().await;
 
-    let chunks = vec![
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}"#.to_string(),
-        r#"{"id":"chatcmpl-test","object":"chat.completion.chunk","created":1711115037,"model":"gpt-4","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":0,"total_tokens":10}}"#.to_string(),
-    ];
-
+    let chunks = load_chunks_fixture("chat-streaming-empty-1");
     test_server
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;

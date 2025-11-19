@@ -1,6 +1,6 @@
 use ai_sdk_provider::language_model::{
-    AssistantContentPart, Message, ResponseInfo, StreamError, TextPart, ToolCallPart,
-    UserContentPart,
+    AssistantContentPart, Message, ResponseInfo, SourcePart, SourceType, StreamError, TextPart,
+    ToolCallPart, UserContentPart,
 };
 use ai_sdk_provider::*;
 use async_stream::stream;
@@ -9,6 +9,15 @@ use futures::stream::StreamExt;
 use log::warn;
 use reqwest::Client;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+// Simple ID generator for source parts
+static SOURCE_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn generate_source_id() -> String {
+    let id = SOURCE_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
+    format!("source-{}", id)
+}
 
 use crate::model_detection::{
     is_o1_model, is_reasoning_model, is_search_preview_model, supports_flex_processing,
@@ -69,6 +78,7 @@ impl OpenAIChatModel {
                         content: Some(crate::api_types::ChatMessageContent::Text(content.clone())),
                         tool_calls: None,
                         tool_call_id: None,
+                        annotations: None,
                     });
                 }
                 Message::User { content } => {
@@ -134,6 +144,7 @@ impl OpenAIChatModel {
                             )),
                             tool_calls: None,
                             tool_call_id: None,
+                            annotations: None,
                         });
                     } else {
                         // Text-only message: join all text parts
@@ -151,6 +162,7 @@ impl OpenAIChatModel {
                             content: Some(crate::api_types::ChatMessageContent::Text(text_content)),
                             tool_calls: None,
                             tool_call_id: None,
+                            annotations: None,
                         });
                     }
                 }
@@ -191,6 +203,7 @@ impl OpenAIChatModel {
                             Some(tool_calls)
                         },
                         tool_call_id: None,
+                        annotations: None,
                     });
                 }
                 Message::Tool { content } => {
@@ -203,6 +216,7 @@ impl OpenAIChatModel {
                             )),
                             tool_calls: None,
                             tool_call_id: Some(tool_result.tool_call_id.clone()),
+                            annotations: None,
                         });
                     }
                 }
@@ -594,6 +608,19 @@ impl LanguageModel for OpenAIChatModel {
             }
         }
 
+        // Add annotations/citations as Source content
+        if let Some(annotations) = &choice.message.annotations {
+            for annotation in annotations {
+                content.push(Content::Source(SourcePart {
+                    id: generate_source_id(),
+                    source_type: SourceType::Url,
+                    url: Some(annotation.url.clone()),
+                    title: Some(annotation.title.clone()),
+                    provider_metadata: None,
+                }));
+            }
+        }
+
         let usage = api_response
             .usage
             .as_ref()
@@ -601,8 +628,14 @@ impl LanguageModel for OpenAIChatModel {
                 input_tokens: Some(u.prompt_tokens),
                 output_tokens: u.completion_tokens,
                 total_tokens: Some(u.total_tokens),
-                reasoning_tokens: None,
-                cached_input_tokens: None,
+                reasoning_tokens: u
+                    .completion_tokens_details
+                    .as_ref()
+                    .and_then(|d| d.reasoning_tokens),
+                cached_input_tokens: u
+                    .prompt_tokens_details
+                    .as_ref()
+                    .and_then(|d| d.cached_tokens),
             })
             .unwrap_or_default();
 
@@ -613,25 +646,46 @@ impl LanguageModel for OpenAIChatModel {
             self.map_finish_reason(choice.finish_reason.as_deref())
         };
 
-        // Build provider metadata with logprobs if present
-        let provider_metadata = if let Some(logprobs) = &choice.logprobs {
-            if let Some(content_logprobs) = logprobs.get("content") {
+        // Build provider metadata with logprobs and prediction tokens if present
+        let provider_metadata = {
+            let mut openai_metadata: HashMap<String, ai_sdk_provider::json_value::JsonValue> =
+                HashMap::new();
+
+            // Add logprobs if present
+            if let Some(logprobs) = &choice.logprobs {
+                if let Some(content_logprobs) = logprobs.get("content") {
+                    let json_value: ai_sdk_provider::json_value::JsonValue =
+                        serde_json::from_value(content_logprobs.clone())
+                            .unwrap_or(ai_sdk_provider::json_value::JsonValue::Null);
+                    openai_metadata.insert("logprobs".to_string(), json_value);
+                }
+            }
+
+            // Add prediction tokens if present
+            if let Some(usage_info) = &api_response.usage {
+                if let Some(details) = &usage_info.completion_tokens_details {
+                    if let Some(accepted) = details.accepted_prediction_tokens {
+                        openai_metadata.insert(
+                            "acceptedPredictionTokens".to_string(),
+                            ai_sdk_provider::json_value::JsonValue::Number(accepted.into()),
+                        );
+                    }
+                    if let Some(rejected) = details.rejected_prediction_tokens {
+                        openai_metadata.insert(
+                            "rejectedPredictionTokens".to_string(),
+                            ai_sdk_provider::json_value::JsonValue::Number(rejected.into()),
+                        );
+                    }
+                }
+            }
+
+            if openai_metadata.is_empty() {
+                None
+            } else {
                 let mut metadata = HashMap::new();
-                let mut openai_metadata = HashMap::new();
-
-                // Convert from serde_json::Value to JsonValue
-                let json_value: ai_sdk_provider::json_value::JsonValue =
-                    serde_json::from_value(content_logprobs.clone())
-                        .unwrap_or(ai_sdk_provider::json_value::JsonValue::Null);
-
-                openai_metadata.insert("logprobs".to_string(), json_value);
                 metadata.insert("openai".to_string(), openai_metadata);
                 Some(metadata)
-            } else {
-                None
             }
-        } else {
-            None
         };
 
         // Build response info
@@ -795,8 +849,14 @@ impl LanguageModel for OpenAIChatModel {
                                             input_tokens: Some(usage_info.prompt_tokens),
                                             output_tokens: usage_info.completion_tokens,
                                             total_tokens: Some(usage_info.total_tokens),
-                                            reasoning_tokens: None,
-                                            cached_input_tokens: None,
+                                            reasoning_tokens: usage_info
+                                                .completion_tokens_details
+                                                .as_ref()
+                                                .and_then(|d| d.reasoning_tokens),
+                                            cached_input_tokens: usage_info
+                                                .prompt_tokens_details
+                                                .as_ref()
+                                                .and_then(|d| d.cached_tokens),
                                         });
                                     }
 
@@ -852,6 +912,19 @@ impl LanguageModel for OpenAIChatModel {
                                                         provider_metadata: None,
                                                     });
                                                 }
+                                            }
+                                        }
+
+                                        // Handle streaming annotations
+                                        if let Some(annotations) = &choice.delta.annotations {
+                                            for annotation in annotations {
+                                                yield Ok(StreamPart::Source(SourcePart {
+                                                    id: generate_source_id(),
+                                                    source_type: SourceType::Url,
+                                                    url: Some(annotation.url.clone()),
+                                                    title: Some(annotation.title.clone()),
+                                                    provider_metadata: None,
+                                                }));
                                             }
                                         }
 
