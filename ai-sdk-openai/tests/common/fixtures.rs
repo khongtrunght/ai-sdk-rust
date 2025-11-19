@@ -5,6 +5,7 @@ use std::path::Path;
 ///
 /// # Arguments
 /// * `filename` - The fixture name without extension (e.g., "chat-completion-simple-1")
+#[allow(dead_code)]
 pub fn load_json_fixture(filename: &str) -> serde_json::Value {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/chat/fixtures")

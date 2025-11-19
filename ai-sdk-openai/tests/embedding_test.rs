@@ -2,7 +2,30 @@ mod common;
 
 use ai_sdk_openai::OpenAIEmbeddingModel;
 use ai_sdk_provider::{EmbedOptions, EmbeddingModel};
-use common::{load_json_fixture, TestServer};
+use common::TestServer;
+use serde_json::json;
+
+// Dummy embeddings for testing (like TypeScript version)
+const DUMMY_EMBEDDINGS: [[f32; 5]; 2] = [[0.1, 0.2, 0.3, 0.4, 0.5], [0.6, 0.7, 0.8, 0.9, 1.0]];
+
+/// Helper to create embedding response JSON (like TypeScript's prepareJsonResponse)
+fn create_embedding_response(embeddings: &[&[f32]], usage: (u32, u32)) -> serde_json::Value {
+    json!({
+        "object": "list",
+        "data": embeddings.iter().enumerate().map(|(i, embedding)| {
+            json!({
+                "object": "embedding",
+                "index": i,
+                "embedding": embedding
+            })
+        }).collect::<Vec<_>>(),
+        "model": "text-embedding-3-small",
+        "usage": {
+            "prompt_tokens": usage.0,
+            "total_tokens": usage.1
+        }
+    })
+}
 
 #[tokio::test]
 async fn test_embedding_model_trait() {
@@ -32,22 +55,53 @@ async fn test_too_many_embeddings() {
     assert!(result.unwrap_err().to_string().contains("Too many"));
 }
 
-// Fixture-based tests (run without API key)
-
 #[tokio::test]
-async fn test_openai_embedding_with_fixture() {
+async fn test_openai_embedding_extract_embedding() {
     // Setup mock server
     let test_server = TestServer::new().await;
 
-    // Load fixture
-    let fixture = load_json_fixture("embedding-basic-1");
+    // Create response with dummy embeddings
+    let response = create_embedding_response(&[&DUMMY_EMBEDDINGS[0], &DUMMY_EMBEDDINGS[1]], (8, 8));
 
-    // Configure mock to return fixture
+    // Configure mock to return response
     test_server
-        .mock_json_response("/v1/embeddings", fixture)
+        .mock_json_response("/v1/embeddings", response)
         .await;
 
     // Create model pointing to mock server
+    let model = OpenAIEmbeddingModel::new("text-embedding-3-small", "test-key")
+        .with_base_url(format!("{}/v1", test_server.base_url));
+
+    let options = EmbedOptions {
+        values: vec![
+            "sunny day at the beach".into(),
+            "rainy day in the city".into(),
+        ],
+        provider_options: None,
+        headers: None,
+    };
+
+    let result = model.do_embed(options).await.unwrap();
+
+    // Verify embeddings match dummy data
+    assert_eq!(result.embeddings.len(), 2);
+    assert_eq!(result.embeddings[0], DUMMY_EMBEDDINGS[0].to_vec());
+    assert_eq!(result.embeddings[1], DUMMY_EMBEDDINGS[1].to_vec());
+}
+
+#[tokio::test]
+async fn test_openai_embedding_extract_usage() {
+    // Setup mock server
+    let test_server = TestServer::new().await;
+
+    // Create response with specific usage
+    let response =
+        create_embedding_response(&[&DUMMY_EMBEDDINGS[0], &DUMMY_EMBEDDINGS[1]], (20, 20));
+
+    test_server
+        .mock_json_response("/v1/embeddings", response)
+        .await;
+
     let model = OpenAIEmbeddingModel::new("text-embedding-3-small", "test-key")
         .with_base_url(format!("{}/v1", test_server.base_url));
 
@@ -57,45 +111,31 @@ async fn test_openai_embedding_with_fixture() {
         headers: None,
     };
 
-    let response = model.do_embed(options).await.unwrap();
+    let result = model.do_embed(options).await.unwrap();
 
-    // Verify response structure
-    assert_eq!(response.embeddings.len(), 2);
-    assert!(!response.embeddings[0].is_empty());
-    assert!(!response.embeddings[1].is_empty());
-    assert!(response.usage.is_some());
-
-    // Snapshot the response structure (but not the actual embeddings as they're large)
-    if let Some(usage) = &response.usage {
-        insta::assert_json_snapshot!(usage, @r###"
-        {
-          "tokens": 12
-        }
-        "###);
+    // Verify usage
+    assert!(result.usage.is_some());
+    if let Some(usage) = &result.usage {
+        assert_eq!(usage.tokens, 20);
     }
-
-    // Verify embedding dimensions (8 dimensions in our fixture)
-    assert_eq!(response.embeddings[0].len(), 8);
-    assert_eq!(response.embeddings[1].len(), 8);
 }
 
 #[tokio::test]
-async fn test_openai_embedding_with_dimensions_fixture() {
+async fn test_openai_embedding_pass_dimensions() {
     use ai_sdk_provider::JsonValue;
     use std::collections::HashMap;
 
     // Setup mock server
     let test_server = TestServer::new().await;
 
-    // Load fixture with 512 dimensions
-    let fixture = load_json_fixture("embedding-512-dims-1");
+    // Create response with 512-dimensional embedding
+    let embedding_512: Vec<f32> = (0..512).map(|i| i as f32 / 512.0).collect();
+    let response = create_embedding_response(&[&embedding_512], (5, 5));
 
-    // Configure mock to return fixture
     test_server
-        .mock_json_response("/v1/embeddings", fixture)
+        .mock_json_response("/v1/embeddings", response)
         .await;
 
-    // Create model pointing to mock server
     let model = OpenAIEmbeddingModel::new("text-embedding-3-small", "test-key")
         .with_base_url(format!("{}/v1", test_server.base_url));
 
@@ -115,17 +155,52 @@ async fn test_openai_embedding_with_dimensions_fixture() {
         headers: None,
     };
 
-    let response = model.do_embed(options).await.unwrap();
+    let result = model.do_embed(options).await.unwrap();
 
     // Verify response structure
-    assert_eq!(response.embeddings.len(), 1);
-
-    // With dimensions=512, the embedding should have 512 dimensions
-    assert_eq!(response.embeddings[0].len(), 512);
+    assert_eq!(result.embeddings.len(), 1);
+    assert_eq!(result.embeddings[0].len(), 512);
 
     // Verify usage
-    assert!(response.usage.is_some());
-    if let Some(usage) = &response.usage {
+    assert!(result.usage.is_some());
+    if let Some(usage) = &result.usage {
         assert_eq!(usage.tokens, 5);
     }
+}
+
+#[tokio::test]
+async fn test_openai_embedding_pass_model_and_values() {
+    // Setup mock server
+    let test_server = TestServer::new().await;
+
+    let response = create_embedding_response(&[&DUMMY_EMBEDDINGS[0], &DUMMY_EMBEDDINGS[1]], (8, 8));
+
+    test_server
+        .mock_json_response("/v1/embeddings", response)
+        .await;
+
+    let model = OpenAIEmbeddingModel::new("text-embedding-3-large", "test-key")
+        .with_base_url(format!("{}/v1", test_server.base_url));
+
+    let test_values = vec![
+        "sunny day at the beach".into(),
+        "rainy day in the city".into(),
+    ];
+
+    let options = EmbedOptions {
+        values: test_values.clone(),
+        provider_options: None,
+        headers: None,
+    };
+
+    model.do_embed(options).await.unwrap();
+
+    // Verify request body
+    let request_body = test_server
+        .last_request_body()
+        .await
+        .expect("Request body should exist");
+    assert_eq!(request_body["model"], "text-embedding-3-large");
+    assert_eq!(request_body["input"], json!(test_values));
+    assert_eq!(request_body["encoding_format"], "float");
 }
