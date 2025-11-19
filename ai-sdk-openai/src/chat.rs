@@ -1,12 +1,27 @@
 use ai_sdk_provider::language_model::{
-    AssistantContentPart, Message, StreamError, TextPart, ToolCallPart, UserContentPart,
+    AssistantContentPart, Message, ResponseInfo, SourcePart, SourceType, StreamError, TextPart,
+    ToolCallPart, UserContentPart,
 };
 use ai_sdk_provider::*;
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::stream::StreamExt;
+use log::warn;
 use reqwest::Client;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+// Simple ID generator for source parts
+static SOURCE_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn generate_source_id() -> String {
+    let id = SOURCE_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
+    format!("source-{}", id)
+}
+
+use crate::model_detection::{
+    is_o1_model, is_reasoning_model, is_search_preview_model, supports_flex_processing,
+};
 
 /// OpenAI implementation of chat model.
 pub struct OpenAIChatModel {
@@ -27,6 +42,24 @@ impl OpenAIChatModel {
         }
     }
 
+    /// Configures a custom base URL for the API endpoint.
+    ///
+    /// This is primarily useful for testing with mock servers.
+    ///
+    /// # Arguments
+    /// * `base_url` - Custom base URL (e.g., "http://localhost:8080")
+    ///
+    /// # Example
+    /// ```rust
+    /// # use ai_sdk_openai::OpenAIChatModel;
+    /// let model = OpenAIChatModel::new("gpt-4", "api-key")
+    ///     .with_base_url("http://localhost:8080");
+    /// ```
+    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.base_url = base_url.into();
+        self
+    }
+
     fn convert_prompt_to_messages(&self, prompt: &[Message]) -> Vec<crate::api_types::ChatMessage> {
         // Convert our prompt format to OpenAI's message format
         let mut openai_messages = Vec::new();
@@ -34,11 +67,18 @@ impl OpenAIChatModel {
         for msg in prompt {
             match msg {
                 Message::System { content } => {
+                    // For o1 models, convert system messages to developer messages
+                    let role = if is_o1_model(&self.model_id) {
+                        "developer"
+                    } else {
+                        "system"
+                    };
                     openai_messages.push(crate::api_types::ChatMessage {
-                        role: "system".into(),
+                        role: role.into(),
                         content: Some(crate::api_types::ChatMessageContent::Text(content.clone())),
                         tool_calls: None,
                         tool_call_id: None,
+                        annotations: None,
                     });
                 }
                 Message::User { content } => {
@@ -104,6 +144,7 @@ impl OpenAIChatModel {
                             )),
                             tool_calls: None,
                             tool_call_id: None,
+                            annotations: None,
                         });
                     } else {
                         // Text-only message: join all text parts
@@ -121,6 +162,7 @@ impl OpenAIChatModel {
                             content: Some(crate::api_types::ChatMessageContent::Text(text_content)),
                             tool_calls: None,
                             tool_call_id: None,
+                            annotations: None,
                         });
                     }
                 }
@@ -161,6 +203,7 @@ impl OpenAIChatModel {
                             Some(tool_calls)
                         },
                         tool_call_id: None,
+                        annotations: None,
                     });
                 }
                 Message::Tool { content } => {
@@ -169,10 +212,11 @@ impl OpenAIChatModel {
                         openai_messages.push(crate::api_types::ChatMessage {
                             role: "tool".into(),
                             content: Some(crate::api_types::ChatMessageContent::Text(
-                                serde_json::to_string(&tool_result.result).unwrap_or_default(),
+                                serde_json::to_string(&tool_result.output).unwrap_or_default(),
                             )),
                             tool_calls: None,
                             tool_call_id: Some(tool_result.tool_call_id.clone()),
+                            annotations: None,
                         });
                     }
                 }
@@ -265,6 +309,130 @@ impl OpenAIChatModel {
             _ => FinishReason::Unknown,
         }
     }
+
+    /// Extract OpenAI-specific options from provider_options
+    fn extract_openai_options(
+        &self,
+        provider_options: &Option<std::collections::HashMap<String, json_value::JsonObject>>,
+    ) -> OpenAIOptions {
+        use json_value::JsonValue;
+
+        let mut opts = OpenAIOptions::default();
+
+        if let Some(provider_opts) = provider_options {
+            if let Some(openai_opts) = provider_opts.get("openai") {
+                // logitBias: HashMap<String, f64>
+                if let Some(JsonValue::Object(logit_bias)) = openai_opts.get("logitBias") {
+                    let mut bias_map = HashMap::new();
+                    for (k, v) in logit_bias {
+                        if let JsonValue::Number(n) = v {
+                            if let Some(f) = n.as_f64() {
+                                bias_map.insert(k.clone(), f);
+                            }
+                        }
+                    }
+                    if !bias_map.is_empty() {
+                        opts.logit_bias = Some(bias_map);
+                    }
+                }
+
+                // logprobs: bool
+                if let Some(JsonValue::Bool(b)) = openai_opts.get("logprobs") {
+                    opts.logprobs = Some(*b);
+                }
+
+                // parallelToolCalls: bool
+                if let Some(JsonValue::Bool(b)) = openai_opts.get("parallelToolCalls") {
+                    opts.parallel_tool_calls = Some(*b);
+                }
+
+                // user: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("user") {
+                    opts.user = Some(s.clone());
+                }
+
+                // reasoningEffort: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("reasoningEffort") {
+                    opts.reasoning_effort = Some(s.clone());
+                }
+
+                // maxCompletionTokens: u32
+                if let Some(JsonValue::Number(n)) = openai_opts.get("maxCompletionTokens") {
+                    if let Some(u) = n.as_u64() {
+                        opts.max_completion_tokens = Some(u as u32);
+                    }
+                }
+
+                // store: bool
+                if let Some(JsonValue::Bool(b)) = openai_opts.get("store") {
+                    opts.store = Some(*b);
+                }
+
+                // metadata: HashMap<String, String>
+                if let Some(JsonValue::Object(metadata)) = openai_opts.get("metadata") {
+                    let mut meta_map = HashMap::new();
+                    for (k, v) in metadata {
+                        if let JsonValue::String(s) = v {
+                            meta_map.insert(k.clone(), s.clone());
+                        }
+                    }
+                    if !meta_map.is_empty() {
+                        opts.metadata = Some(meta_map);
+                    }
+                }
+
+                // prediction: JsonValue
+                if let Some(v) = openai_opts.get("prediction") {
+                    // Convert JsonValue to serde_json::Value
+                    if let Ok(json_str) = serde_json::to_string(v) {
+                        if let Ok(json_val) = serde_json::from_str(&json_str) {
+                            opts.prediction = Some(json_val);
+                        }
+                    }
+                }
+
+                // serviceTier: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("serviceTier") {
+                    opts.service_tier = Some(s.clone());
+                }
+
+                // textVerbosity: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("textVerbosity") {
+                    opts.verbosity = Some(s.clone());
+                }
+
+                // promptCacheKey: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("promptCacheKey") {
+                    opts.prompt_cache_key = Some(s.clone());
+                }
+
+                // safetyIdentifier: String
+                if let Some(JsonValue::String(s)) = openai_opts.get("safetyIdentifier") {
+                    opts.safety_identifier = Some(s.clone());
+                }
+            }
+        }
+
+        opts
+    }
+}
+
+/// Struct to hold extracted OpenAI options
+#[derive(Default)]
+struct OpenAIOptions {
+    logit_bias: Option<HashMap<String, f64>>,
+    logprobs: Option<bool>,
+    parallel_tool_calls: Option<bool>,
+    user: Option<String>,
+    reasoning_effort: Option<String>,
+    max_completion_tokens: Option<u32>,
+    store: Option<bool>,
+    metadata: Option<HashMap<String, String>>,
+    prediction: Option<serde_json::Value>,
+    service_tier: Option<String>,
+    verbosity: Option<String>,
+    prompt_cache_key: Option<String>,
+    safety_identifier: Option<String>,
 }
 
 #[async_trait]
@@ -287,11 +455,50 @@ impl LanguageModel for OpenAIChatModel {
         &self,
         options: CallOptions,
     ) -> Result<GenerateResponse, Box<dyn std::error::Error + Send + Sync>> {
+        // Extract OpenAI-specific options
+        let openai_opts = self.extract_openai_options(&options.provider_options);
+
+        // Handle temperature for search preview models
+        let temperature = if is_search_preview_model(&self.model_id) {
+            if options.temperature.is_some() {
+                warn!(
+                    "Temperature is not supported for search preview model '{}'. Removing temperature setting.",
+                    self.model_id
+                );
+            }
+            None
+        } else {
+            options.temperature
+        };
+
+        // Handle max_tokens vs max_completion_tokens for reasoning models
+        let (max_tokens, max_completion_tokens) = if is_reasoning_model(&self.model_id) {
+            // For reasoning models, use max_completion_tokens instead of max_tokens
+            let mct = openai_opts
+                .max_completion_tokens
+                .or(options.max_output_tokens);
+            (None, mct)
+        } else {
+            (options.max_output_tokens, openai_opts.max_completion_tokens)
+        };
+
+        // Validate service_tier for flex processing
+        let service_tier = match &openai_opts.service_tier {
+            Some(tier) if tier == "flex" && !supports_flex_processing(&self.model_id) => {
+                warn!(
+                    "Flex processing is not supported for model '{}'. Supported models: o3, o4-mini, gpt-5. Service tier will be ignored.",
+                    self.model_id
+                );
+                None
+            }
+            tier => tier.clone(),
+        };
+
         let request = crate::api_types::ChatCompletionRequest {
             model: self.model_id.clone(),
             messages: self.convert_prompt_to_messages(&options.prompt),
-            temperature: options.temperature,
-            max_tokens: options.max_output_tokens,
+            temperature,
+            max_tokens,
             stream: Some(false),
             tools: options.tools.as_ref().map(|t| self.convert_tools(t)),
             tool_choice: options
@@ -303,16 +510,40 @@ impl LanguageModel for OpenAIChatModel {
                 .as_ref()
                 .map(|rf| self.convert_response_format(rf)),
             stream_options: None, // Not needed for non-streaming
+
+            // OpenAI-specific options
+            logit_bias: openai_opts.logit_bias,
+            logprobs: openai_opts.logprobs,
+            top_logprobs: None, // TODO: Extract from logprobs if it's a number
+            user: openai_opts.user,
+            parallel_tool_calls: openai_opts.parallel_tool_calls,
+            reasoning_effort: openai_opts.reasoning_effort,
+            max_completion_tokens,
+            store: openai_opts.store,
+            metadata: openai_opts.metadata,
+            prediction: openai_opts.prediction,
+            service_tier,
+            verbosity: openai_opts.verbosity,
+            prompt_cache_key: openai_opts.prompt_cache_key,
+            safety_identifier: openai_opts.safety_identifier,
         };
 
-        let response = self
+        // Build request with custom headers
+        let mut request_builder = self
             .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await?;
+            .json(&request);
+
+        // Add custom headers if provided
+        if let Some(headers) = &options.headers {
+            for (key, value) in headers {
+                request_builder = request_builder.header(key, value);
+            }
+        }
+
+        let response = request_builder.send().await?;
 
         if !response.status().is_success() {
             return Err(Box::new(crate::error::OpenAIError::ApiError {
@@ -320,6 +551,13 @@ impl LanguageModel for OpenAIChatModel {
                 status_code: Some(response.status().as_u16()),
             }));
         }
+
+        // Capture headers before consuming response
+        let headers: HashMap<String, String> = response
+            .headers()
+            .iter()
+            .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
+            .collect();
 
         let api_response: crate::api_types::ChatCompletionResponse = response.json().await?;
 
@@ -370,15 +608,34 @@ impl LanguageModel for OpenAIChatModel {
             }
         }
 
+        // Add annotations/citations as Source content
+        if let Some(annotations) = &choice.message.annotations {
+            for annotation in annotations {
+                content.push(Content::Source(SourcePart {
+                    id: generate_source_id(),
+                    source_type: SourceType::Url,
+                    url: Some(annotation.url.clone()),
+                    title: Some(annotation.title.clone()),
+                    provider_metadata: None,
+                }));
+            }
+        }
+
         let usage = api_response
             .usage
             .as_ref()
             .map(|u| Usage {
                 input_tokens: Some(u.prompt_tokens),
-                output_tokens: Some(u.completion_tokens),
+                output_tokens: u.completion_tokens,
                 total_tokens: Some(u.total_tokens),
-                reasoning_tokens: None,
-                cached_input_tokens: None,
+                reasoning_tokens: u
+                    .completion_tokens_details
+                    .as_ref()
+                    .and_then(|d| d.reasoning_tokens),
+                cached_input_tokens: u
+                    .prompt_tokens_details
+                    .as_ref()
+                    .and_then(|d| d.cached_tokens),
             })
             .unwrap_or_default();
 
@@ -389,13 +646,71 @@ impl LanguageModel for OpenAIChatModel {
             self.map_finish_reason(choice.finish_reason.as_deref())
         };
 
+        // Build provider metadata with logprobs and prediction tokens if present
+        let provider_metadata = {
+            let mut openai_metadata: HashMap<String, ai_sdk_provider::json_value::JsonValue> =
+                HashMap::new();
+
+            // Add logprobs if present
+            if let Some(logprobs) = &choice.logprobs {
+                if let Some(content_logprobs) = logprobs.get("content") {
+                    let json_value: ai_sdk_provider::json_value::JsonValue =
+                        serde_json::from_value(content_logprobs.clone())
+                            .unwrap_or(ai_sdk_provider::json_value::JsonValue::Null);
+                    openai_metadata.insert("logprobs".to_string(), json_value);
+                }
+            }
+
+            // Add prediction tokens if present
+            if let Some(usage_info) = &api_response.usage {
+                if let Some(details) = &usage_info.completion_tokens_details {
+                    if let Some(accepted) = details.accepted_prediction_tokens {
+                        openai_metadata.insert(
+                            "acceptedPredictionTokens".to_string(),
+                            ai_sdk_provider::json_value::JsonValue::Number(accepted.into()),
+                        );
+                    }
+                    if let Some(rejected) = details.rejected_prediction_tokens {
+                        openai_metadata.insert(
+                            "rejectedPredictionTokens".to_string(),
+                            ai_sdk_provider::json_value::JsonValue::Number(rejected.into()),
+                        );
+                    }
+                }
+            }
+
+            if openai_metadata.is_empty() {
+                None
+            } else {
+                let mut metadata = HashMap::new();
+                metadata.insert("openai".to_string(), openai_metadata);
+                Some(metadata)
+            }
+        };
+
+        // Build response info
+        let response_info = Some(ResponseInfo {
+            headers: Some(headers),
+            body: Some(serde_json::to_value(&api_response).unwrap_or(serde_json::json!({}))),
+            id: Some(api_response.id.clone()),
+            timestamp: Some({
+                // Convert Unix timestamp to ISO 8601
+                let secs = api_response.created as i64;
+                let hours = secs / 3600;
+                let minutes = (secs % 3600) / 60;
+                let seconds = secs % 60;
+                format!("1970-01-01T{:02}:{:02}:{:02}Z", hours, minutes, seconds)
+            }),
+            model_id: Some(api_response.model.clone()),
+        });
+
         Ok(GenerateResponse {
             content,
             finish_reason,
             usage,
-            provider_metadata: None,
+            provider_metadata,
             request: None,
-            response: None,
+            response: response_info,
             warnings: vec![],
         })
     }
@@ -404,11 +719,50 @@ impl LanguageModel for OpenAIChatModel {
         &self,
         options: CallOptions,
     ) -> Result<StreamResponse, Box<dyn std::error::Error + Send + Sync + 'static>> {
+        // Extract OpenAI-specific options
+        let openai_opts = self.extract_openai_options(&options.provider_options);
+
+        // Handle temperature for search preview models
+        let temperature = if is_search_preview_model(&self.model_id) {
+            if options.temperature.is_some() {
+                warn!(
+                    "Temperature is not supported for search preview model '{}'. Removing temperature setting.",
+                    self.model_id
+                );
+            }
+            None
+        } else {
+            options.temperature
+        };
+
+        // Handle max_tokens vs max_completion_tokens for reasoning models
+        let (max_tokens, max_completion_tokens) = if is_reasoning_model(&self.model_id) {
+            // For reasoning models, use max_completion_tokens instead of max_tokens
+            let mct = openai_opts
+                .max_completion_tokens
+                .or(options.max_output_tokens);
+            (None, mct)
+        } else {
+            (options.max_output_tokens, openai_opts.max_completion_tokens)
+        };
+
+        // Validate service_tier for flex processing
+        let service_tier = match &openai_opts.service_tier {
+            Some(tier) if tier == "flex" && !supports_flex_processing(&self.model_id) => {
+                warn!(
+                    "Flex processing is not supported for model '{}'. Supported models: o3, o4-mini, gpt-5. Service tier will be ignored.",
+                    self.model_id
+                );
+                None
+            }
+            tier => tier.clone(),
+        };
+
         let request = crate::api_types::ChatCompletionRequest {
             model: self.model_id.clone(),
             messages: self.convert_prompt_to_messages(&options.prompt),
-            temperature: options.temperature,
-            max_tokens: options.max_output_tokens,
+            temperature,
+            max_tokens,
             stream: Some(true),
             tools: options.tools.as_ref().map(|t| self.convert_tools(t)),
             tool_choice: options
@@ -422,16 +776,40 @@ impl LanguageModel for OpenAIChatModel {
             stream_options: Some(crate::api_types::StreamOptions {
                 include_usage: true,
             }),
+
+            // OpenAI-specific options
+            logit_bias: openai_opts.logit_bias,
+            logprobs: openai_opts.logprobs,
+            top_logprobs: None,
+            user: openai_opts.user,
+            parallel_tool_calls: openai_opts.parallel_tool_calls,
+            reasoning_effort: openai_opts.reasoning_effort,
+            max_completion_tokens,
+            store: openai_opts.store,
+            metadata: openai_opts.metadata,
+            prediction: openai_opts.prediction,
+            service_tier,
+            verbosity: openai_opts.verbosity,
+            prompt_cache_key: openai_opts.prompt_cache_key,
+            safety_identifier: openai_opts.safety_identifier,
         };
 
-        let response = self
+        // Build request with custom headers
+        let mut request_builder = self
             .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await?;
+            .json(&request);
+
+        // Add custom headers if provided
+        if let Some(headers) = &options.headers {
+            for (key, value) in headers {
+                request_builder = request_builder.header(key, value);
+            }
+        }
+
+        let response = request_builder.send().await?;
 
         let status = response.status();
         if !status.is_success() {
@@ -469,10 +847,16 @@ impl LanguageModel for OpenAIChatModel {
                                     if let Some(usage_info) = &chunk.usage {
                                         accumulated_usage = Some(Usage {
                                             input_tokens: Some(usage_info.prompt_tokens),
-                                            output_tokens: Some(usage_info.completion_tokens),
+                                            output_tokens: usage_info.completion_tokens,
                                             total_tokens: Some(usage_info.total_tokens),
-                                            reasoning_tokens: None,
-                                            cached_input_tokens: None,
+                                            reasoning_tokens: usage_info
+                                                .completion_tokens_details
+                                                .as_ref()
+                                                .and_then(|d| d.reasoning_tokens),
+                                            cached_input_tokens: usage_info
+                                                .prompt_tokens_details
+                                                .as_ref()
+                                                .and_then(|d| d.cached_tokens),
                                         });
                                     }
 
@@ -528,6 +912,19 @@ impl LanguageModel for OpenAIChatModel {
                                                         provider_metadata: None,
                                                     });
                                                 }
+                                            }
+                                        }
+
+                                        // Handle streaming annotations
+                                        if let Some(annotations) = &choice.delta.annotations {
+                                            for annotation in annotations {
+                                                yield Ok(StreamPart::Source(SourcePart {
+                                                    id: generate_source_id(),
+                                                    source_type: SourceType::Url,
+                                                    url: Some(annotation.url.clone()),
+                                                    title: Some(annotation.title.clone()),
+                                                    provider_metadata: None,
+                                                }));
                                             }
                                         }
 

@@ -178,7 +178,7 @@ impl ToolLoopAgent {
 
             // Execute tools
             let tool_calls = step_result.tool_calls.as_ref().unwrap();
-            let tool_results = tool_executor.execute_tools(tool_calls.clone()).await?;
+            let tool_results = tool_executor.execute_tools(tool_calls.clone()).await;
 
             // Append assistant message with tool calls
             messages.push(Message::Assistant {

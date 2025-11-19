@@ -104,6 +104,9 @@ pub mod agent;
 /// Middleware system for customizing language model behavior
 pub mod middleware;
 
+/// Provider registry system for multi-provider management
+pub mod registry;
+
 // Re-export commonly used types from ai-sdk-provider
 pub use ai_sdk_provider::language_model::{
     CallOptions, Content, FinishReason, LanguageModel, Message, ToolCallPart, ToolResultPart, Usage,
@@ -118,4 +121,4 @@ pub use generate_text::{generate_text, GenerateTextBuilder, GenerateTextResult, 
 pub use retry::RetryPolicy;
 pub use stop_condition::{stop_after_steps, stop_on_finish, StopCondition};
 pub use stream_text::{stream_text, StreamTextBuilder, StreamTextResult, TextStreamPart};
-pub use tool::{Tool, ToolContext, ToolExecutor};
+pub use tool::{Tool, ToolContext, ToolExecutor, ToolOutput};

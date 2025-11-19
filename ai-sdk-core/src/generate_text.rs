@@ -3,9 +3,14 @@ use crate::retry::RetryPolicy;
 use crate::tool::{Tool, ToolExecutor};
 use ai_sdk_provider::language_model::{
     AssistantContentPart, CallOptions, Content, FinishReason, LanguageModel, Message, TextPart,
-    Tool as ProviderTool, ToolCallPart, ToolChoice, Usage, UserContentPart,
+    Tool as ProviderTool, ToolCallPart, ToolChoice, ToolResultPart, Usage, UserContentPart,
 };
+use futures::future::BoxFuture;
 use std::sync::Arc;
+
+/// Callback type for preliminary tool results (streaming tools)
+pub type OnPreliminaryToolResultCallback =
+    Arc<dyn Fn(ToolResultPart) -> BoxFuture<'static, ()> + Send + Sync>;
 
 /// Builder for text generation with optional tool calling
 pub struct GenerateTextBuilder {
@@ -16,6 +21,7 @@ pub struct GenerateTextBuilder {
     temperature: Option<f32>,
     max_tokens: Option<u32>,
     retry_policy: RetryPolicy,
+    on_preliminary_tool_result: Option<OnPreliminaryToolResultCallback>,
 }
 
 impl GenerateTextBuilder {
@@ -29,6 +35,7 @@ impl GenerateTextBuilder {
             temperature: None,
             max_tokens: None,
             retry_policy: RetryPolicy::default(),
+            on_preliminary_tool_result: None,
         }
     }
 
@@ -80,6 +87,12 @@ impl GenerateTextBuilder {
     /// Set retry policy
     pub fn retry_policy(mut self, retry_policy: RetryPolicy) -> Self {
         self.retry_policy = retry_policy;
+        self
+    }
+
+    /// Set callback for preliminary tool results (streaming tools)
+    pub fn on_preliminary_tool_result(mut self, callback: OnPreliminaryToolResultCallback) -> Self {
+        self.on_preliminary_tool_result = Some(callback);
         self
     }
 
@@ -161,7 +174,28 @@ impl GenerateTextBuilder {
             }
 
             // Execute tools
-            let tool_results = tool_executor.execute_tools(tool_calls).await?;
+            let tool_results = if let Some(ref callback) = self.on_preliminary_tool_result {
+                // Execute with streaming support
+                let mut results = Vec::new();
+                for tool_call in tool_calls {
+                    let callback = callback.clone();
+                    let result = tool_executor
+                        .execute_tool_with_stream(tool_call, move |preliminary| {
+                            let cb = callback.clone();
+                            let preliminary = preliminary.clone();
+                            // Spawn async callback
+                            tokio::spawn(async move {
+                                cb(preliminary).await;
+                            });
+                        })
+                        .await;
+                    results.push(result);
+                }
+                results
+            } else {
+                // Standard non-streaming execution
+                tool_executor.execute_tools(tool_calls).await
+            };
 
             // Append assistant message with tool calls
             messages.push(Message::Assistant {

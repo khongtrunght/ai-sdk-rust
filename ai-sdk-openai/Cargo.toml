@@ -28,6 +28,14 @@ futures = { workspace = true }
 reqwest = { workspace = true }
 thiserror = { workspace = true }
 base64 = "0.22"
+log = "0.4"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+wiremock = "0.6"
+insta = { version = "1.43", features = ["json", "yaml"] }
+serde_json = { workspace = true }
+tokio-stream = { workspace = true }
 
 [[example]]
 name = "openai_basic"
@@ -56,3 +64,7 @@ path = "examples/middleware_demo.rs"
 [[example]]
 name = "tool_loop_agent"
 path = "examples/tool_loop_agent.rs"
+
+[[example]]
+name = "multi_provider_registry"
+path = "examples/multi_provider_registry.rs"

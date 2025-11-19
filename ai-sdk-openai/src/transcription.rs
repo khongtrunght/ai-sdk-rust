@@ -24,6 +24,24 @@ impl OpenAITranscriptionModel {
         }
     }
 
+    /// Configures a custom base URL for the API endpoint.
+    ///
+    /// This is primarily useful for testing with mock servers.
+    ///
+    /// # Arguments
+    /// * `base_url` - Custom base URL (e.g., "http://localhost:8080")
+    ///
+    /// # Example
+    /// ```rust
+    /// # use ai_sdk_openai::OpenAITranscriptionModel;
+    /// let model = OpenAITranscriptionModel::new("whisper-1", "api-key")
+    ///     .with_base_url("http://localhost:8080");
+    /// ```
+    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
+        self.base_url = base_url.into();
+        self
+    }
+
     fn get_file_extension(&self, media_type: &str) -> &str {
         // Map common IANA media types to file extensions
         match media_type {

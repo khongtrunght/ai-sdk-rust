@@ -9,7 +9,7 @@
 use ai_sdk_core::agent::{
     step_count_is, Agent, AgentCallParameters, ToolLoopAgent, ToolLoopAgentSettings,
 };
-use ai_sdk_core::{Tool, ToolContext, ToolError};
+use ai_sdk_core::{Tool, ToolContext, ToolError, ToolOutput};
 use ai_sdk_openai::OpenAIChatModel;
 use ai_sdk_provider::JsonValue;
 use async_trait::async_trait;
@@ -42,7 +42,7 @@ impl Tool for WeatherTool {
         })
     }
 
-    async fn execute(&self, input: Value, _context: &ToolContext) -> Result<JsonValue, ToolError> {
+    async fn execute(&self, input: Value, _context: &ToolContext) -> Result<ToolOutput, ToolError> {
         // Extract location from input
         let location = input
             .get("location")
@@ -62,7 +62,7 @@ impl Tool for WeatherTool {
         }))
         .map_err(|e| ToolError::execution(format!("Failed to create result: {}", e)))?;
 
-        Ok(weather_data)
+        Ok(ToolOutput::Value(weather_data))
     }
 }
 
@@ -101,7 +101,7 @@ impl Tool for CalculatorTool {
         })
     }
 
-    async fn execute(&self, input: Value, _context: &ToolContext) -> Result<JsonValue, ToolError> {
+    async fn execute(&self, input: Value, _context: &ToolContext) -> Result<ToolOutput, ToolError> {
         let operation = input
             .get("operation")
             .and_then(|v| v.as_str())
@@ -145,7 +145,7 @@ impl Tool for CalculatorTool {
         }))
         .map_err(|e| ToolError::execution(format!("Failed to create result: {}", e)))?;
 
-        Ok(result_json)
+        Ok(ToolOutput::Value(result_json))
     }
 }
 
