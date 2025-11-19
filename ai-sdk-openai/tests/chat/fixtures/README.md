@@ -67,3 +67,17 @@ To add a new fixture:
 - **TypeScript:** Copied from `packages/openai/src/chat/__fixtures__/`
 - **Created:** New fixtures created for Rust-specific test scenarios
 - **Captured:** Real API responses (sanitized) for comprehensive coverage
+
+## Test Coverage Summary
+
+The fixtures support 72 tests across 8 test modules:
+- `basic_test.rs` - 9 tests (basic generation, usage, metadata)
+- `settings_test.rs` - 8 tests (settings propagation)
+- `response_format_test.rs` - 9 tests (JSON schema, structured outputs)
+- `tool_calling_test.rs` - 4 tests (function calling)
+- `model_specific_test.rs` - 7 tests (o1/o3/o4 models)
+- `extension_settings_test.rs` - 10 tests (OpenAI extensions)
+- `advanced_features_test.rs` - 5 tests (annotations, tokens)
+- `streaming_test.rs` - 19 tests (streaming scenarios)
+
+Status: 58 tests passing, 14 tests ignored (pending feature implementation)
