@@ -23,5 +23,6 @@
 //! Target: 72 tests (100% parity with TypeScript)
 
 mod basic_test;
+mod response_format_test;
 mod settings_test;
 mod tool_calling_test;
