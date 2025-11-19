@@ -42,6 +42,7 @@ dependencies = [
  "base64",
  "futures",
  "insta",
+ "log",
  "reqwest",
  "serde",
  "serde_json",

@@ -9,13 +9,9 @@ use std::collections::HashMap;
 // Phase 4: Model-Specific Behavior Tests
 
 #[tokio::test]
-#[ignore = "Requires is_reasoning_model detection to convert max_tokens to max_completion_tokens - not yet implemented"]
 async fn test_convert_max_output_tokens_to_max_completion_tokens() {
     // TypeScript reference: line 1259
     // Test that maxOutputTokens is converted to max_completion_tokens for reasoning models
-    //
-    // TODO: Implement is_reasoning_model() check in chat.rs
-    // TODO: Use max_completion_tokens instead of max_tokens for reasoning models
     let test_server = TestServer::new().await;
 
     let response_json = json!({
@@ -58,8 +54,16 @@ async fn test_convert_max_output_tokens_to_max_completion_tokens() {
         .await
         .expect("Generate should succeed");
 
-    // The request should use max_completion_tokens instead of max_tokens
-    // This is specific behavior for reasoning models
+    // Verify the request uses max_completion_tokens instead of max_tokens
+    let request_body = test_server
+        .last_request_body()
+        .await
+        .expect("Should have request");
+    assert_eq!(request_body["max_completion_tokens"], 1000);
+    assert!(
+        request_body["max_tokens"].is_null(),
+        "max_tokens should not be set for reasoning models"
+    );
 }
 
 #[tokio::test]
@@ -120,13 +124,9 @@ async fn test_flex_processing_for_o4_mini() {
 }
 
 #[tokio::test]
-#[ignore = "Requires o1 model detection and system-to-developer message conversion - not yet implemented"]
 async fn test_developer_messages_for_o1() {
     // TypeScript reference: line 1277
     // Test that system messages are converted to developer messages for o1 models
-    //
-    // TODO: Implement is_o1_model() check in chat.rs
-    // TODO: Convert system messages to developer messages for o1 models
     let test_server = TestServer::new().await;
 
     let response_json = json!({
@@ -173,8 +173,21 @@ async fn test_developer_messages_for_o1() {
         .await
         .expect("Generate should succeed");
 
-    // The request should convert system message to developer message for o1
-    // System: "You are a helpful assistant." -> Developer: "You are a helpful assistant."
+    // Verify the request converts system message to developer message for o1
+    let request_body = test_server
+        .last_request_body()
+        .await
+        .expect("Should have request");
+    let messages = request_body["messages"]
+        .as_array()
+        .expect("Should have messages");
+
+    // First message should be converted to "developer" role
+    assert_eq!(messages[0]["role"], "developer");
+    assert_eq!(messages[0]["content"], "You are a helpful assistant.");
+
+    // Second message should remain as "user"
+    assert_eq!(messages[1]["role"], "user");
 }
 
 #[tokio::test]

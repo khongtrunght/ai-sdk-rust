@@ -6,8 +6,13 @@ use ai_sdk_provider::*;
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::stream::StreamExt;
+use log::warn;
 use reqwest::Client;
 use std::collections::HashMap;
+
+use crate::model_detection::{
+    is_o1_model, is_reasoning_model, is_search_preview_model, supports_flex_processing,
+};
 
 /// OpenAI implementation of chat model.
 pub struct OpenAIChatModel {
@@ -53,8 +58,14 @@ impl OpenAIChatModel {
         for msg in prompt {
             match msg {
                 Message::System { content } => {
+                    // For o1 models, convert system messages to developer messages
+                    let role = if is_o1_model(&self.model_id) {
+                        "developer"
+                    } else {
+                        "system"
+                    };
                     openai_messages.push(crate::api_types::ChatMessage {
-                        role: "system".into(),
+                        role: role.into(),
                         content: Some(crate::api_types::ChatMessageContent::Text(content.clone())),
                         tool_calls: None,
                         tool_call_id: None,
@@ -433,11 +444,47 @@ impl LanguageModel for OpenAIChatModel {
         // Extract OpenAI-specific options
         let openai_opts = self.extract_openai_options(&options.provider_options);
 
+        // Handle temperature for search preview models
+        let temperature = if is_search_preview_model(&self.model_id) {
+            if options.temperature.is_some() {
+                warn!(
+                    "Temperature is not supported for search preview model '{}'. Removing temperature setting.",
+                    self.model_id
+                );
+            }
+            None
+        } else {
+            options.temperature
+        };
+
+        // Handle max_tokens vs max_completion_tokens for reasoning models
+        let (max_tokens, max_completion_tokens) = if is_reasoning_model(&self.model_id) {
+            // For reasoning models, use max_completion_tokens instead of max_tokens
+            let mct = openai_opts
+                .max_completion_tokens
+                .or(options.max_output_tokens);
+            (None, mct)
+        } else {
+            (options.max_output_tokens, openai_opts.max_completion_tokens)
+        };
+
+        // Validate service_tier for flex processing
+        let service_tier = match &openai_opts.service_tier {
+            Some(tier) if tier == "flex" && !supports_flex_processing(&self.model_id) => {
+                warn!(
+                    "Flex processing is not supported for model '{}'. Supported models: o3, o4-mini, gpt-5. Service tier will be ignored.",
+                    self.model_id
+                );
+                None
+            }
+            tier => tier.clone(),
+        };
+
         let request = crate::api_types::ChatCompletionRequest {
             model: self.model_id.clone(),
             messages: self.convert_prompt_to_messages(&options.prompt),
-            temperature: options.temperature,
-            max_tokens: options.max_output_tokens,
+            temperature,
+            max_tokens,
             stream: Some(false),
             tools: options.tools.as_ref().map(|t| self.convert_tools(t)),
             tool_choice: options
@@ -457,11 +504,11 @@ impl LanguageModel for OpenAIChatModel {
             user: openai_opts.user,
             parallel_tool_calls: openai_opts.parallel_tool_calls,
             reasoning_effort: openai_opts.reasoning_effort,
-            max_completion_tokens: openai_opts.max_completion_tokens,
+            max_completion_tokens,
             store: openai_opts.store,
             metadata: openai_opts.metadata,
             prediction: openai_opts.prediction,
-            service_tier: openai_opts.service_tier,
+            service_tier,
             verbosity: openai_opts.verbosity,
             prompt_cache_key: openai_opts.prompt_cache_key,
             safety_identifier: openai_opts.safety_identifier,
@@ -621,11 +668,47 @@ impl LanguageModel for OpenAIChatModel {
         // Extract OpenAI-specific options
         let openai_opts = self.extract_openai_options(&options.provider_options);
 
+        // Handle temperature for search preview models
+        let temperature = if is_search_preview_model(&self.model_id) {
+            if options.temperature.is_some() {
+                warn!(
+                    "Temperature is not supported for search preview model '{}'. Removing temperature setting.",
+                    self.model_id
+                );
+            }
+            None
+        } else {
+            options.temperature
+        };
+
+        // Handle max_tokens vs max_completion_tokens for reasoning models
+        let (max_tokens, max_completion_tokens) = if is_reasoning_model(&self.model_id) {
+            // For reasoning models, use max_completion_tokens instead of max_tokens
+            let mct = openai_opts
+                .max_completion_tokens
+                .or(options.max_output_tokens);
+            (None, mct)
+        } else {
+            (options.max_output_tokens, openai_opts.max_completion_tokens)
+        };
+
+        // Validate service_tier for flex processing
+        let service_tier = match &openai_opts.service_tier {
+            Some(tier) if tier == "flex" && !supports_flex_processing(&self.model_id) => {
+                warn!(
+                    "Flex processing is not supported for model '{}'. Supported models: o3, o4-mini, gpt-5. Service tier will be ignored.",
+                    self.model_id
+                );
+                None
+            }
+            tier => tier.clone(),
+        };
+
         let request = crate::api_types::ChatCompletionRequest {
             model: self.model_id.clone(),
             messages: self.convert_prompt_to_messages(&options.prompt),
-            temperature: options.temperature,
-            max_tokens: options.max_output_tokens,
+            temperature,
+            max_tokens,
             stream: Some(true),
             tools: options.tools.as_ref().map(|t| self.convert_tools(t)),
             tool_choice: options
@@ -647,11 +730,11 @@ impl LanguageModel for OpenAIChatModel {
             user: openai_opts.user,
             parallel_tool_calls: openai_opts.parallel_tool_calls,
             reasoning_effort: openai_opts.reasoning_effort,
-            max_completion_tokens: openai_opts.max_completion_tokens,
+            max_completion_tokens,
             store: openai_opts.store,
             metadata: openai_opts.metadata,
             prediction: openai_opts.prediction,
-            service_tier: openai_opts.service_tier,
+            service_tier,
             verbosity: openai_opts.verbosity,
             prompt_cache_key: openai_opts.prompt_cache_key,
             safety_identifier: openai_opts.safety_identifier,

@@ -28,6 +28,7 @@ futures = { workspace = true }
 reqwest = { workspace = true }
 thiserror = { workspace = true }
 base64 = "0.22"
+log = "0.4"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

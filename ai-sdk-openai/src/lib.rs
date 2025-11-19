@@ -49,6 +49,7 @@ mod chat;
 mod embedding;
 mod error;
 mod image;
+pub mod model_detection;
 mod multimodal;
 mod provider;
 mod speech;

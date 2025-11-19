@@ -82,4 +82,15 @@ impl TestServer {
             .mount(&self.server)
             .await;
     }
+
+    /// Gets the last received request's body as JSON
+    ///
+    /// # Returns
+    /// The last request body as a serde_json::Value, or None if no requests were received
+    #[allow(dead_code)]
+    pub async fn last_request_body(&self) -> Option<serde_json::Value> {
+        let requests = self.server.received_requests().await?;
+        let last_request = requests.last()?;
+        serde_json::from_slice(&last_request.body).ok()
+    }
 }
