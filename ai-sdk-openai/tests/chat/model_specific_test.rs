@@ -9,66 +9,6 @@ use std::collections::HashMap;
 // Phase 4: Model-Specific Behavior Tests
 
 #[tokio::test]
-#[ignore = "Requires is_reasoning_model detection and warning system - not yet implemented"]
-async fn test_clear_settings_for_reasoning_models() {
-    // TypeScript reference: line 1217
-    // Test that temperature, top_p, frequency_penalty, presence_penalty are cleared
-    // for reasoning models (o1, o3, o4) and warnings are returned
-    //
-    // TODO: Implement is_reasoning_model() check in chat.rs
-    // TODO: Clear temperature/top_p/frequency_penalty/presence_penalty for o1/o3/o4 models
-    // TODO: Return warnings for unsupported settings
-    let test_server = TestServer::new().await;
-
-    let response_json = json!({
-        "id": "chatcmpl-test",
-        "object": "chat.completion",
-        "created": 1711115037,
-        "model": "o4-mini",
-        "choices": [{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": "Response"
-            },
-            "finish_reason": "stop"
-        }],
-        "usage": {
-            "prompt_tokens": 4,
-            "completion_tokens": 1,
-            "total_tokens": 5
-        }
-    });
-
-    test_server
-        .mock_json_response("/v1/chat/completions", response_json)
-        .await;
-
-    let model = OpenAIChatModel::new("o4-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
-
-    let _response = model
-        .do_generate(CallOptions {
-            prompt: vec![Message::User {
-                content: vec![UserContentPart::Text {
-                    text: "Hello".to_string(),
-                }],
-            }],
-            temperature: Some(0.5),
-            top_p: Some(0.7),
-            frequency_penalty: Some(0.2),
-            presence_penalty: Some(0.3),
-            ..Default::default()
-        })
-        .await
-        .expect("Generate should succeed");
-
-    // The request should have these settings cleared for reasoning models
-    // and warnings should be returned about unsupported settings
-    // Note: Warning system not yet fully implemented in Rust
-}
-
-#[tokio::test]
 #[ignore = "Requires is_reasoning_model detection to convert max_tokens to max_completion_tokens - not yet implemented"]
 async fn test_convert_max_output_tokens_to_max_completion_tokens() {
     // TypeScript reference: line 1259
@@ -120,61 +60,6 @@ async fn test_convert_max_output_tokens_to_max_completion_tokens() {
 
     // The request should use max_completion_tokens instead of max_tokens
     // This is specific behavior for reasoning models
-}
-
-#[tokio::test]
-#[ignore = "Requires is_search_preview_model detection and warning system - not yet implemented"]
-async fn test_remove_temperature_for_search_preview_models() {
-    // TypeScript reference: line 1455
-    // Test that temperature is removed for search preview models
-    //
-    // TODO: Implement is_search_preview_model() check in chat.rs
-    // TODO: Remove temperature for search preview models
-    // TODO: Return warning about unsupported setting
-    let test_server = TestServer::new().await;
-
-    let response_json = json!({
-        "id": "chatcmpl-test",
-        "object": "chat.completion",
-        "created": 1711115037,
-        "model": "gpt-4o-search-preview",
-        "choices": [{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": "Response"
-            },
-            "finish_reason": "stop"
-        }],
-        "usage": {
-            "prompt_tokens": 4,
-            "completion_tokens": 1,
-            "total_tokens": 5
-        }
-    });
-
-    test_server
-        .mock_json_response("/v1/chat/completions", response_json)
-        .await;
-
-    let model = OpenAIChatModel::new("gpt-4o-search-preview", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
-
-    let _response = model
-        .do_generate(CallOptions {
-            prompt: vec![Message::User {
-                content: vec![UserContentPart::Text {
-                    text: "Hello".to_string(),
-                }],
-            }],
-            temperature: Some(0.7),
-            ..Default::default()
-        })
-        .await
-        .expect("Generate should succeed");
-
-    // Temperature should be removed from request and warning returned
-    // for search preview models
 }
 
 #[tokio::test]
@@ -232,70 +117,6 @@ async fn test_flex_processing_for_o4_mini() {
         .expect("Generate should succeed");
 
     // The request should include service_tier: "flex"
-}
-
-#[tokio::test]
-#[ignore = "Requires flex processing model validation and warning system - not yet implemented"]
-async fn test_flex_processing_warning_for_unsupported_model() {
-    // TypeScript reference: line 1549
-    // Test that warning is shown when using flex processing with unsupported model
-    //
-    // TODO: Implement model validation for flex processing (only o3, o4-mini, gpt-5)
-    // TODO: Remove service_tier from request for unsupported models
-    // TODO: Return warning about flex processing not available
-    let test_server = TestServer::new().await;
-
-    let response_json = json!({
-        "id": "chatcmpl-test",
-        "object": "chat.completion",
-        "created": 1711115037,
-        "model": "gpt-4o-mini",
-        "choices": [{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": "Response"
-            },
-            "finish_reason": "stop"
-        }],
-        "usage": {
-            "prompt_tokens": 4,
-            "completion_tokens": 1,
-            "total_tokens": 5
-        }
-    });
-
-    test_server
-        .mock_json_response("/v1/chat/completions", response_json)
-        .await;
-
-    let mut provider_options: HashMap<String, JsonObject> = HashMap::new();
-    let mut openai_options: JsonObject = HashMap::new();
-    openai_options.insert(
-        "serviceTier".to_string(),
-        JsonValue::String("flex".to_string()),
-    );
-    provider_options.insert("openai".to_string(), openai_options);
-
-    let model = OpenAIChatModel::new("gpt-4o-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
-
-    let _response = model
-        .do_generate(CallOptions {
-            prompt: vec![Message::User {
-                content: vec![UserContentPart::Text {
-                    text: "Hello".to_string(),
-                }],
-            }],
-            provider_options: Some(provider_options),
-            ..Default::default()
-        })
-        .await
-        .expect("Generate should succeed");
-
-    // Warning should be returned about flex processing not being available
-    // for gpt-4o-mini model
-    // Note: Warning system not yet fully implemented in Rust
 }
 
 #[tokio::test]
