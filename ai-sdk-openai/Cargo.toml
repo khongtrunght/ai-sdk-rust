@@ -16,8 +16,9 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-ai-sdk-provider = { version = "0.2.0", path = "../ai-sdk-provider" }
-ai-sdk-core = { version = "0.2.0", path = "../ai-sdk-core" }
+ai-sdk-provider = { workspace = true }
+ai-sdk-core = { workspace = true }
+ai-sdk-provider-utils = { path = "../ai-sdk-provider-utils", features = ["reqwest"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 async-trait = { workspace = true }
@@ -29,6 +30,9 @@ reqwest = { workspace = true }
 thiserror = { workspace = true }
 base64 = "0.22"
 log = "0.4"
+strum_macros = "0.27.2"
+strum = "0.27.2"
+once_cell = "1.21.3"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

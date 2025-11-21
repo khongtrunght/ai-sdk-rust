@@ -1,5 +1,4 @@
-use crate::common::TestServer;
-use ai_sdk_openai::*;
+use crate::common::{create_test_model, TestServer};
 use ai_sdk_provider::json_value::{JsonObject, JsonValue};
 use ai_sdk_provider::language_model::{
     FunctionTool, Message, ResponseFormat, Tool, ToolChoice, UserContentPart,
@@ -40,8 +39,7 @@ async fn test_no_response_format_for_text() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-2024-08-06", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-2024-08-06");
 
     let _ = model
         .do_generate(CallOptions {
@@ -90,8 +88,7 @@ async fn test_forward_json_as_json_object_without_schema() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-2024-08-06", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-2024-08-06");
 
     let _ = model
         .do_generate(CallOptions {
@@ -149,8 +146,7 @@ async fn test_forward_json_as_json_object_when_structured_outputs_disabled() {
     openai_options.insert("structuredOutputs".to_string(), JsonValue::Bool(false));
     provider_options.insert("openai".to_string(), openai_options);
 
-    let model = OpenAIChatModel::new("gpt-4o-2024-08-06", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-2024-08-06");
 
     let _response = model
         .do_generate(CallOptions {
@@ -212,8 +208,7 @@ async fn test_forward_json_response_format_as_json_schema() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-2024-08-06", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-2024-08-06");
 
     let _ = model
         .do_generate(CallOptions {
@@ -279,8 +274,7 @@ async fn test_use_json_schema_strict_with_response_format_json() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-2024-08-06", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-2024-08-06");
 
     let _ = model
         .do_generate(CallOptions {
@@ -339,8 +333,7 @@ async fn test_set_name_and_description_with_response_format_json() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-2024-08-06", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-2024-08-06");
 
     let _ = model
         .do_generate(CallOptions {
@@ -407,8 +400,7 @@ async fn test_allow_undefined_schema_with_response_format_json() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-2024-08-06", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-2024-08-06");
 
     let _ = model
         .do_generate(CallOptions {
@@ -469,8 +461,7 @@ async fn test_set_strict_with_tool_calls_when_structured_outputs_enabled() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-2024-08-06", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-2024-08-06");
 
     let tool = Tool::Function(FunctionTool {
         name: "test-tool".to_string(),
@@ -551,8 +542,7 @@ async fn test_tools_without_structured_outputs() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-2024-08-06", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-2024-08-06");
 
     let tool = Tool::Function(FunctionTool {
         name: "get_weather".to_string(),

@@ -1,48 +1,16 @@
+use crate::{
+    embedding::OpenAIEmbeddingProviderOptions,
+    openai_config::{OpenAIConfig, OpenAIUrlOptions},
+};
 use ai_sdk_provider::*;
+use ai_sdk_provider_utils::merge_headers_reqwest;
 use async_trait::async_trait;
 use reqwest::Client;
+
 use serde::{Deserialize, Serialize};
 
-/// OpenAI implementation of embedding model.
-pub struct OpenAIEmbeddingModel {
-    model_id: String,
-    api_key: String,
-    client: Client,
-    base_url: String,
-}
-
-impl OpenAIEmbeddingModel {
-    /// Creates a new embedding model with the specified model ID and API key.
-    pub fn new(model_id: impl Into<String>, api_key: impl Into<String>) -> Self {
-        Self {
-            model_id: model_id.into(),
-            api_key: api_key.into(),
-            client: Client::new(),
-            base_url: "https://api.openai.com/v1".into(),
-        }
-    }
-
-    /// Configures a custom base URL for the API endpoint.
-    ///
-    /// This is primarily useful for testing with mock servers.
-    ///
-    /// # Arguments
-    /// * `base_url` - Custom base URL (e.g., "http://localhost:8080")
-    ///
-    /// # Example
-    /// ```rust
-    /// # use ai_sdk_openai::OpenAIEmbeddingModel;
-    /// let model = OpenAIEmbeddingModel::new("text-embedding-3-small", "api-key")
-    ///     .with_base_url("http://localhost:8080");
-    /// ```
-    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
-        self.base_url = base_url.into();
-        self
-    }
-}
-
-#[derive(Serialize)]
-struct EmbeddingRequest {
+#[derive(Serialize, Deserialize)]
+pub struct EmbeddingRequest {
     model: String,
     input: Vec<String>,
     encoding_format: String,
@@ -52,20 +20,42 @@ struct EmbeddingRequest {
     user: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct EmbeddingApiResponse {
+#[derive(Serialize, Deserialize)]
+pub struct EmbeddingApiResponse {
     data: Vec<EmbeddingData>,
     usage: Option<UsageInfo>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct EmbeddingData {
     embedding: Vec<f32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct UsageInfo {
     prompt_tokens: u32,
+}
+
+/// OpenAI implementation of embedding model.
+pub struct OpenAIEmbeddingModel {
+    model_id: String,
+
+    client: Client,
+
+    config: OpenAIConfig,
+}
+
+impl OpenAIEmbeddingModel {
+    const MAX_EMBEDDINGS_PER_CALL: usize = 2048;
+    const SUPPORTS_PARALLEL_CALLS: bool = true;
+    /// Creates a new embedding model with the specified model ID and API key.
+    pub fn new(model_id: impl Into<String>, config: impl Into<OpenAIConfig>) -> Self {
+        Self {
+            model_id: model_id.into(),
+            client: Client::new(),
+            config: config.into(),
+        }
+    }
 }
 
 #[async_trait]
@@ -79,11 +69,11 @@ impl EmbeddingModel<String> for OpenAIEmbeddingModel {
     }
 
     async fn max_embeddings_per_call(&self) -> Option<usize> {
-        Some(2048)
+        Some(Self::MAX_EMBEDDINGS_PER_CALL)
     }
 
     async fn supports_parallel_calls(&self) -> bool {
-        true
+        Self::SUPPORTS_PARALLEL_CALLS
     }
 
     async fn do_embed(
@@ -102,28 +92,13 @@ impl EmbeddingModel<String> for OpenAIEmbeddingModel {
             }
         }
 
-        let url = format!("{}/embeddings", self.base_url);
+        let url = (self.config.url)(OpenAIUrlOptions {
+            model_id: self.model_id.clone(),
+            path: "/embeddings".into(),
+        });
 
-        // Extract dimensions from provider options if present
-        let dimensions = options
-            .provider_options
-            .as_ref()
-            .and_then(|opts| opts.get("openai"))
-            .and_then(|openai_opts| openai_opts.get("dimensions"))
-            .and_then(|d| match d {
-                JsonValue::Number(n) => n.as_u64().map(|n| n as u32),
-                _ => None,
-            });
-
-        let user = options
-            .provider_options
-            .as_ref()
-            .and_then(|opts| opts.get("openai"))
-            .and_then(|openai_opts| openai_opts.get("user"))
-            .and_then(|u| match u {
-                JsonValue::String(s) => Some(s.clone()),
-                _ => None,
-            });
+        let OpenAIEmbeddingProviderOptions { dimensions, user }: OpenAIEmbeddingProviderOptions =
+            options.provider_options.into();
 
         let request_body = EmbeddingRequest {
             model: self.model_id.clone(),
@@ -133,21 +108,17 @@ impl EmbeddingModel<String> for OpenAIEmbeddingModel {
             user,
         };
 
-        let mut request = self
+        let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
-            .json(&request_body);
-
-        // Add custom headers if provided
-        if let Some(headers) = &options.headers {
-            for (key, value) in headers {
-                request = request.header(key, value);
-            }
-        }
-
-        let response = request.send().await?;
+            .headers(merge_headers_reqwest(
+                (self.config.headers)(),
+                options.headers.as_ref(),
+            ))
+            .json(&request_body)
+            .send()
+            .await?;
 
         let status = response.status();
         let response_headers: std::collections::HashMap<String, String> = response

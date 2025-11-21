@@ -1,5 +1,5 @@
-use ai_sdk_openai::OpenAIImageModel;
-use ai_sdk_provider::{ImageData, ImageGenerateOptions, ImageModel};
+use ai_sdk_openai::OpenAIProvider;
+use ai_sdk_provider::{ImageData, ImageGenerateOptions, ProviderV3};
 use base64::Engine;
 use std::fs::File;
 use std::io::Write;
@@ -14,11 +14,12 @@ async fn main() {
 
 async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let api_key = std::env::var("OPENAI_API_KEY")?;
-    let model = OpenAIImageModel::new("dall-e-3", api_key);
+    let provider = OpenAIProvider::builder().with_api_key(api_key).build();
+    let model = provider.image_model("dall-e-3").unwrap();
 
     let options = ImageGenerateOptions {
         prompt: "A serene landscape with mountains and a lake at sunset".into(),
-        n: 1,
+        n: Some(1),
         size: Some("1024x1024".into()),
         aspect_ratio: None,
         seed: None,

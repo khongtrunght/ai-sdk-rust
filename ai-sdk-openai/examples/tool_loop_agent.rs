@@ -10,8 +10,8 @@ use ai_sdk_core::agent::{
     step_count_is, Agent, AgentCallParameters, ToolLoopAgent, ToolLoopAgentSettings,
 };
 use ai_sdk_core::{Tool, ToolContext, ToolError, ToolOutput};
-use ai_sdk_openai::OpenAIChatModel;
-use ai_sdk_provider::JsonValue;
+use ai_sdk_openai::OpenAIProvider;
+use ai_sdk_provider::{JsonValue, ProviderV3};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -159,7 +159,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("═══════════════════════════\n");
 
     // Create the language model
-    let model = Arc::new(OpenAIChatModel::new("gpt-4o-mini", api_key));
+    let provider = OpenAIProvider::new(api_key);
+    let model = provider.language_model("gpt-4o-mini").unwrap();
 
     // Create executable tools
     let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(WeatherTool), Arc::new(CalculatorTool)];
@@ -171,7 +172,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     // Create the agent settings
-    let settings = ToolLoopAgentSettings::builder(model)
+    let settings = ToolLoopAgentSettings::builder(model.clone())
         .id("weather-agent")
         .instructions("You are a helpful assistant with access to weather and calculation tools. Use the tools when needed to answer user questions accurately.")
         .tools(tools)

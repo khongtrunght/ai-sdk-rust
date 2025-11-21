@@ -1,12 +1,13 @@
-use ai_sdk_openai::OpenAISpeechModel;
-use ai_sdk_provider::{AudioData, SpeechGenerateOptions, SpeechModel};
+use ai_sdk_openai::{OpenAIConfig, OpenAIProvider, OpenAISpeechModel};
+use ai_sdk_provider::{AudioData, ProviderV3, SpeechGenerateOptions, SpeechModel};
 
 #[tokio::test]
 #[ignore] // Requires OPENAI_API_KEY
 async fn test_openai_speech_generation() {
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
-    let model = OpenAISpeechModel::new("tts-1", api_key);
+    let provider = OpenAIProvider::builder().with_api_key(api_key).build();
+    let model = provider.speech_model("tts-1").unwrap();
 
     let options = SpeechGenerateOptions {
         text: "Hello, this is a test of text to speech.".into(),
@@ -38,7 +39,8 @@ async fn test_openai_speech_generation() {
 async fn test_openai_speech_with_speed() {
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
-    let model = OpenAISpeechModel::new("tts-1-hd", api_key);
+    let provider = OpenAIProvider::builder().with_api_key(api_key).build();
+    let model = provider.speech_model("tts-1-hd").unwrap();
 
     let options = SpeechGenerateOptions {
         text: "Testing speed control.".into(),
@@ -67,7 +69,8 @@ async fn test_openai_speech_with_speed() {
 async fn test_openai_speech_unsupported_format_warning() {
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
-    let model = OpenAISpeechModel::new("tts-1", api_key);
+    let provider = OpenAIProvider::builder().with_api_key(api_key).build();
+    let model = provider.speech_model("tts-1").unwrap();
 
     let options = SpeechGenerateOptions {
         text: "Testing unsupported format.".into(),
@@ -96,7 +99,7 @@ async fn test_openai_speech_unsupported_format_warning() {
 async fn test_openai_speech_language_warning() {
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
-    let model = OpenAISpeechModel::new("tts-1", api_key);
+    let model = OpenAISpeechModel::new("tts-1", OpenAIConfig::from_api_key(api_key));
 
     let options = SpeechGenerateOptions {
         text: "Testing language parameter.".into(),

@@ -1,7 +1,7 @@
 mod common;
 
-use ai_sdk_openai::OpenAIImageModel;
-use ai_sdk_provider::{ImageData, ImageGenerateOptions, ImageModel};
+use ai_sdk_openai::OpenAIProvider;
+use ai_sdk_provider::{ImageData, ImageGenerateOptions, ProviderV3};
 use common::TestServer;
 use serde_json::json;
 
@@ -23,19 +23,22 @@ fn create_image_response(images: &[(&str, Option<&str>)]) -> serde_json::Value {
 
 #[tokio::test]
 async fn test_max_images_per_call() {
-    let model = OpenAIImageModel::new("dall-e-3", "test-key");
+    let provider = OpenAIProvider::builder().with_api_key("test-key").build();
+
+    let model = provider.image_model("dall-e-3").unwrap();
     assert_eq!(model.max_images_per_call().await, Some(1));
 
-    let model = OpenAIImageModel::new("dall-e-2", "test-key");
+    let model = provider.image_model("dall-e-2").unwrap();
     assert_eq!(model.max_images_per_call().await, Some(10));
 
-    let model = OpenAIImageModel::new("gpt-image-1", "test-key");
+    let model = provider.image_model("gpt-image-1").unwrap();
     assert_eq!(model.max_images_per_call().await, Some(10));
 }
 
 #[tokio::test]
 async fn test_model_properties() {
-    let model = OpenAIImageModel::new("dall-e-3", "test-key");
+    let provider = OpenAIProvider::builder().with_api_key("test-key").build();
+    let model = provider.image_model("dall-e-3").unwrap();
     assert_eq!(model.provider(), "openai");
     assert_eq!(model.model_id(), "dall-e-3");
     assert_eq!(model.specification_version(), "v3");
@@ -59,12 +62,15 @@ async fn test_openai_image_extract_images() {
         .mock_json_response("/v1/images/generations", response)
         .await;
 
-    let model = OpenAIImageModel::new("dall-e-3", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let provider = OpenAIProvider::builder()
+        .with_api_key("test-key")
+        .with_base_url(format!("{}/v1", test_server.base_url))
+        .build();
+    let model = provider.image_model("dall-e-3").unwrap();
 
     let options = ImageGenerateOptions {
         prompt: "A cute baby sea otter".into(),
-        n: 1,
+        n: Some(1),
         size: None,
         aspect_ratio: None,
         seed: None,
@@ -99,12 +105,15 @@ async fn test_openai_image_pass_model_and_settings() {
         .mock_json_response("/v1/images/generations", response)
         .await;
 
-    let model = OpenAIImageModel::new("dall-e-3", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let provider = OpenAIProvider::builder()
+        .with_api_key("test-key")
+        .with_base_url(format!("{}/v1", test_server.base_url))
+        .build();
+    let model = provider.image_model("dall-e-3").unwrap();
 
     let options = ImageGenerateOptions {
         prompt: "A cute baby sea otter".into(),
-        n: 1,
+        n: Some(1),
         size: Some("1024x1024".into()),
         aspect_ratio: None,
         seed: None,

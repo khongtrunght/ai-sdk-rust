@@ -1,12 +1,13 @@
-use ai_sdk_openai::OpenAITranscriptionModel;
-use ai_sdk_provider::{AudioInput, TranscriptionModel, TranscriptionOptions};
+use ai_sdk_openai::OpenAIProvider;
+use ai_sdk_provider::{AudioInput, ProviderV3, TranscriptionOptions};
 
 #[tokio::test]
 #[ignore] // Requires OPENAI_API_KEY and test audio file
 async fn test_openai_transcription_with_binary_audio() {
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
-    let model = OpenAITranscriptionModel::new("whisper-1", api_key);
+    let provider = OpenAIProvider::new(api_key);
+    let model = provider.transcription_model("whisper-1").unwrap();
 
     // Load a test audio file (you need to provide a sample audio file)
     // For actual testing, place a test audio file in the tests directory
@@ -58,7 +59,8 @@ async fn test_openai_transcription_with_binary_audio() {
 async fn test_openai_transcription_with_base64_audio() {
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
-    let model = OpenAITranscriptionModel::new("whisper-1", api_key);
+    let provider = OpenAIProvider::new(api_key);
+    let model = provider.transcription_model("whisper-1").unwrap();
 
     // Load and encode audio to base64
     let audio_bytes = std::fs::read("tests/test_audio.mp3")
@@ -87,7 +89,10 @@ async fn test_openai_transcription_gpt4o_model() {
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
     // Test with gpt-4o-mini-transcribe which uses "json" format instead of "verbose_json"
-    let model = OpenAITranscriptionModel::new("gpt-4o-mini-transcribe", api_key);
+    let provider = OpenAIProvider::new(api_key);
+    let model = provider
+        .transcription_model("gpt-4o-mini-transcribe")
+        .unwrap();
 
     let audio_data = std::fs::read("tests/test_audio.mp3")
         .expect("test_audio.mp3 not found - please provide a test audio file");
@@ -111,7 +116,8 @@ async fn test_openai_transcription_gpt4o_model() {
 async fn test_transcription_with_different_media_types() {
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
-    let _model = OpenAITranscriptionModel::new("whisper-1", api_key);
+    let provider = OpenAIProvider::new(api_key);
+    let _model = provider.transcription_model("whisper-1").unwrap();
 
     // Test with different media types - ensure file extension is correctly determined
     let test_cases = vec![
@@ -143,7 +149,8 @@ async fn test_transcription_with_different_media_types() {
 
 #[test]
 fn test_model_metadata() {
-    let model = OpenAITranscriptionModel::new("whisper-1", "test-key");
+    let provider = OpenAIProvider::new("test-key");
+    let model = provider.transcription_model("whisper-1").unwrap();
 
     assert_eq!(model.provider(), "openai");
     assert_eq!(model.model_id(), "whisper-1");

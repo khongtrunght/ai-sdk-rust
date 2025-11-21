@@ -1,44 +1,27 @@
 use ai_sdk_provider::*;
+use ai_sdk_provider_utils::merge_headers_reqwest;
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::openai_config::{OpenAIConfig, OpenAIUrlOptions};
+
 /// OpenAI implementation of image model.
 pub struct OpenAIImageModel {
     model_id: String,
-    api_key: String,
     client: Client,
-    base_url: String,
+    config: OpenAIConfig,
 }
 
 impl OpenAIImageModel {
     /// Creates a new image model with the specified model ID and API key.
-    pub fn new(model_id: impl Into<String>, api_key: impl Into<String>) -> Self {
+    pub fn new(model_id: impl Into<String>, config: impl Into<OpenAIConfig>) -> Self {
         Self {
             model_id: model_id.into(),
-            api_key: api_key.into(),
             client: Client::new(),
-            base_url: "https://api.openai.com/v1".into(),
+            config: config.into(),
         }
-    }
-
-    /// Configures a custom base URL for the API endpoint.
-    ///
-    /// This is primarily useful for testing with mock servers.
-    ///
-    /// # Arguments
-    /// * `base_url` - Custom base URL (e.g., "http://localhost:8080")
-    ///
-    /// # Example
-    /// ```rust
-    /// # use ai_sdk_openai::OpenAIImageModel;
-    /// let model = OpenAIImageModel::new("dall-e-3", "api-key")
-    ///     .with_base_url("http://localhost:8080");
-    /// ```
-    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
-        self.base_url = base_url.into();
-        self
     }
 
     /// Check if this model has a default response format
@@ -59,12 +42,12 @@ struct ImageRequest {
     response_format: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct ImageApiResponse {
     data: Vec<ImageResponseData>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct ImageResponseData {
     b64_json: String,
     #[serde(default)]
@@ -112,13 +95,17 @@ impl ImageModel for OpenAIImageModel {
             });
         }
 
-        let url = format!("{}/images/generations", self.base_url);
+        // let url = format!("{}/images/generations", (self.config.url)());
+        let url = (self.config.url)(OpenAIUrlOptions {
+            model_id: self.model_id.clone(),
+            path: "/images/generations".into(),
+        });
 
         // Build request body
         let request_body = ImageRequest {
             model: self.model_id.clone(),
             prompt: options.prompt,
-            n: if options.n > 0 { Some(options.n) } else { None },
+            n: options.n,
             size: options.size,
             response_format: if !self.has_default_response_format() {
                 Some("b64_json".into())
@@ -127,24 +114,17 @@ impl ImageModel for OpenAIImageModel {
             },
         };
 
-        // Add provider-specific options from provider_options
-        // (In the full implementation, we would merge OpenAI-specific options here)
-
-        let mut request = self
+        let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
-            .json(&request_body);
-
-        // Add custom headers if provided
-        if let Some(headers) = &options.headers {
-            for (key, value) in headers {
-                request = request.header(key, value);
-            }
-        }
-
-        let response = request.send().await?;
+            .headers(merge_headers_reqwest(
+                (self.config.headers)(),
+                options.headers.as_ref(),
+            ))
+            .json(&request_body)
+            .send()
+            .await?;
 
         let status = response.status();
         let response_headers: HashMap<String, String> = response

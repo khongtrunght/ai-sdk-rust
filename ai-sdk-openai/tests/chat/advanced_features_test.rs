@@ -1,5 +1,4 @@
-use crate::common::TestServer;
-use ai_sdk_openai::*;
+use crate::common::{create_test_model, TestServer};
 use ai_sdk_provider::language_model::{Message, UserContentPart};
 use ai_sdk_provider::*;
 use serde_json::json;
@@ -48,8 +47,7 @@ async fn test_parse_annotations_citations() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-search-preview", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-search-preview");
 
     let response = model
         .do_generate(CallOptions {
@@ -113,8 +111,7 @@ async fn test_cached_tokens_in_prompt_details() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-mini");
 
     let response = model
         .do_generate(CallOptions {
@@ -173,8 +170,7 @@ async fn test_prediction_tokens_in_metadata() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-mini");
 
     let response = model
         .do_generate(CallOptions {
@@ -254,8 +250,7 @@ async fn test_audio_tokens_in_metadata() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-audio-preview", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-audio-preview");
 
     let response = model
         .do_generate(CallOptions {
@@ -308,8 +303,8 @@ async fn test_system_fingerprint_in_metadata() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    // Create model pointing to mock server
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let response = model
         .do_generate(CallOptions {

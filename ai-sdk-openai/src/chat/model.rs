@@ -3,61 +3,58 @@ use ai_sdk_provider::language_model::{
     ToolCallPart, UserContentPart,
 };
 use ai_sdk_provider::*;
+use ai_sdk_provider_utils::merge_headers_reqwest;
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::stream::StreamExt;
 use log::warn;
 use reqwest::Client;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-
-// Simple ID generator for source parts
-static SOURCE_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-fn generate_source_id() -> String {
-    let id = SOURCE_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
-    format!("source-{}", id)
-}
 
 use crate::model_detection::{
-    is_o1_model, is_reasoning_model, is_search_preview_model, supports_flex_processing,
+    is_reasoning_model, is_search_preview_model, supports_flex_processing,
 };
+use crate::openai_config::{OpenAIConfig, OpenAIUrlOptions};
+
+use super::{generate_source_id, options::OpenAIChatOptions};
 
 /// OpenAI implementation of chat model.
 pub struct OpenAIChatModel {
     model_id: String,
-    api_key: String,
+    config: OpenAIConfig,
     client: Client,
-    base_url: String,
 }
 
 impl OpenAIChatModel {
-    /// Creates a new chat model with the specified model ID and API key.
-    pub fn new(model_id: impl Into<String>, api_key: impl Into<String>) -> Self {
-        Self {
-            model_id: model_id.into(),
-            api_key: api_key.into(),
-            client: Client::new(),
-            base_url: "https://api.openai.com/v1".into(),
-        }
-    }
-
-    /// Configures a custom base URL for the API endpoint.
-    ///
-    /// This is primarily useful for testing with mock servers.
+    /// Creates a new chat model with the specified model ID and configuration.
     ///
     /// # Arguments
-    /// * `base_url` - Custom base URL (e.g., "http://localhost:8080")
+    /// * `model_id` - The model ID (e.g., "gpt-4", "gpt-4o")
+    /// * `config` - OpenAI configuration
     ///
     /// # Example
-    /// ```rust
-    /// # use ai_sdk_openai::OpenAIChatModel;
-    /// let model = OpenAIChatModel::new("gpt-4", "api-key")
-    ///     .with_base_url("http://localhost:8080");
+    /// ```rust,ignore
+    /// use ai_sdk_openai::{OpenAIConfig, OpenAIChatModel};
+    ///
+    /// let api_key = std::env::var("OPENAI_API_KEY").unwrap();
+    /// let config = OpenAIConfig::new(
+    ///     "openai",
+    ///     |opts| format!("https://api.openai.com/v1{}", opts.path),
+    ///     move || {
+    ///         let mut headers = std::collections::HashMap::new();
+    ///         headers.insert("Authorization".to_string(), format!("Bearer {}", api_key));
+    ///         headers
+    ///     }
+    /// );
+    ///
+    /// let model = OpenAIChatModel::new("gpt-4", config);
     /// ```
-    pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
-        self.base_url = base_url.into();
-        self
+    pub fn new(model_id: impl Into<String>, config: impl Into<OpenAIConfig>) -> Self {
+        Self {
+            model_id: model_id.into(),
+            config: config.into(),
+            client: Client::new(),
+        }
     }
 
     fn convert_prompt_to_messages(&self, prompt: &[Message]) -> Vec<crate::api_types::ChatMessage> {
@@ -67,8 +64,8 @@ impl OpenAIChatModel {
         for msg in prompt {
             match msg {
                 Message::System { content } => {
-                    // For o1 models, convert system messages to developer messages
-                    let role = if is_o1_model(&self.model_id) {
+                    // For reasoning models, convert system messages to developer messages
+                    let role = if is_reasoning_model(&self.model_id) {
                         "developer"
                     } else {
                         "system"
@@ -309,130 +306,6 @@ impl OpenAIChatModel {
             _ => FinishReason::Unknown,
         }
     }
-
-    /// Extract OpenAI-specific options from provider_options
-    fn extract_openai_options(
-        &self,
-        provider_options: &Option<std::collections::HashMap<String, json_value::JsonObject>>,
-    ) -> OpenAIOptions {
-        use json_value::JsonValue;
-
-        let mut opts = OpenAIOptions::default();
-
-        if let Some(provider_opts) = provider_options {
-            if let Some(openai_opts) = provider_opts.get("openai") {
-                // logitBias: HashMap<String, f64>
-                if let Some(JsonValue::Object(logit_bias)) = openai_opts.get("logitBias") {
-                    let mut bias_map = HashMap::new();
-                    for (k, v) in logit_bias {
-                        if let JsonValue::Number(n) = v {
-                            if let Some(f) = n.as_f64() {
-                                bias_map.insert(k.clone(), f);
-                            }
-                        }
-                    }
-                    if !bias_map.is_empty() {
-                        opts.logit_bias = Some(bias_map);
-                    }
-                }
-
-                // logprobs: bool
-                if let Some(JsonValue::Bool(b)) = openai_opts.get("logprobs") {
-                    opts.logprobs = Some(*b);
-                }
-
-                // parallelToolCalls: bool
-                if let Some(JsonValue::Bool(b)) = openai_opts.get("parallelToolCalls") {
-                    opts.parallel_tool_calls = Some(*b);
-                }
-
-                // user: String
-                if let Some(JsonValue::String(s)) = openai_opts.get("user") {
-                    opts.user = Some(s.clone());
-                }
-
-                // reasoningEffort: String
-                if let Some(JsonValue::String(s)) = openai_opts.get("reasoningEffort") {
-                    opts.reasoning_effort = Some(s.clone());
-                }
-
-                // maxCompletionTokens: u32
-                if let Some(JsonValue::Number(n)) = openai_opts.get("maxCompletionTokens") {
-                    if let Some(u) = n.as_u64() {
-                        opts.max_completion_tokens = Some(u as u32);
-                    }
-                }
-
-                // store: bool
-                if let Some(JsonValue::Bool(b)) = openai_opts.get("store") {
-                    opts.store = Some(*b);
-                }
-
-                // metadata: HashMap<String, String>
-                if let Some(JsonValue::Object(metadata)) = openai_opts.get("metadata") {
-                    let mut meta_map = HashMap::new();
-                    for (k, v) in metadata {
-                        if let JsonValue::String(s) = v {
-                            meta_map.insert(k.clone(), s.clone());
-                        }
-                    }
-                    if !meta_map.is_empty() {
-                        opts.metadata = Some(meta_map);
-                    }
-                }
-
-                // prediction: JsonValue
-                if let Some(v) = openai_opts.get("prediction") {
-                    // Convert JsonValue to serde_json::Value
-                    if let Ok(json_str) = serde_json::to_string(v) {
-                        if let Ok(json_val) = serde_json::from_str(&json_str) {
-                            opts.prediction = Some(json_val);
-                        }
-                    }
-                }
-
-                // serviceTier: String
-                if let Some(JsonValue::String(s)) = openai_opts.get("serviceTier") {
-                    opts.service_tier = Some(s.clone());
-                }
-
-                // textVerbosity: String
-                if let Some(JsonValue::String(s)) = openai_opts.get("textVerbosity") {
-                    opts.verbosity = Some(s.clone());
-                }
-
-                // promptCacheKey: String
-                if let Some(JsonValue::String(s)) = openai_opts.get("promptCacheKey") {
-                    opts.prompt_cache_key = Some(s.clone());
-                }
-
-                // safetyIdentifier: String
-                if let Some(JsonValue::String(s)) = openai_opts.get("safetyIdentifier") {
-                    opts.safety_identifier = Some(s.clone());
-                }
-            }
-        }
-
-        opts
-    }
-}
-
-/// Struct to hold extracted OpenAI options
-#[derive(Default)]
-struct OpenAIOptions {
-    logit_bias: Option<HashMap<String, f64>>,
-    logprobs: Option<bool>,
-    parallel_tool_calls: Option<bool>,
-    user: Option<String>,
-    reasoning_effort: Option<String>,
-    max_completion_tokens: Option<u32>,
-    store: Option<bool>,
-    metadata: Option<HashMap<String, String>>,
-    prediction: Option<serde_json::Value>,
-    service_tier: Option<String>,
-    verbosity: Option<String>,
-    prompt_cache_key: Option<String>,
-    safety_identifier: Option<String>,
 }
 
 #[async_trait]
@@ -456,7 +329,7 @@ impl LanguageModel for OpenAIChatModel {
         options: CallOptions,
     ) -> Result<GenerateResponse, Box<dyn std::error::Error + Send + Sync>> {
         // Extract OpenAI-specific options
-        let openai_opts = self.extract_openai_options(&options.provider_options);
+        let openai_opts = OpenAIChatOptions::from_provider_options(&options.provider_options);
 
         // Handle temperature for search preview models
         let temperature = if is_search_preview_model(&self.model_id) {
@@ -528,22 +401,24 @@ impl LanguageModel for OpenAIChatModel {
             safety_identifier: openai_opts.safety_identifier,
         };
 
-        // Build request with custom headers
-        let mut request_builder = self
+        // Build request URL using config
+        let url = (self.config.url)(OpenAIUrlOptions {
+            model_id: self.model_id.clone(),
+            path: "/chat/completions".to_string(),
+        });
+
+        // Build request with merged headers
+        let response = self
             .client
-            .post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .post(url)
             .header("Content-Type", "application/json")
-            .json(&request);
-
-        // Add custom headers if provided
-        if let Some(headers) = &options.headers {
-            for (key, value) in headers {
-                request_builder = request_builder.header(key, value);
-            }
-        }
-
-        let response = request_builder.send().await?;
+            .headers(merge_headers_reqwest(
+                (self.config.headers)(),
+                options.headers.as_ref(),
+            ))
+            .json(&request)
+            .send()
+            .await?;
 
         if !response.status().is_success() {
             return Err(Box::new(crate::error::OpenAIError::ApiError {
@@ -720,7 +595,7 @@ impl LanguageModel for OpenAIChatModel {
         options: CallOptions,
     ) -> Result<StreamResponse, Box<dyn std::error::Error + Send + Sync + 'static>> {
         // Extract OpenAI-specific options
-        let openai_opts = self.extract_openai_options(&options.provider_options);
+        let openai_opts = OpenAIChatOptions::from_provider_options(&options.provider_options);
 
         // Handle temperature for search preview models
         let temperature = if is_search_preview_model(&self.model_id) {
@@ -794,22 +669,24 @@ impl LanguageModel for OpenAIChatModel {
             safety_identifier: openai_opts.safety_identifier,
         };
 
-        // Build request with custom headers
-        let mut request_builder = self
+        // Build request URL using config
+        let url = (self.config.url)(OpenAIUrlOptions {
+            model_id: self.model_id.clone(),
+            path: "/chat/completions".to_string(),
+        });
+
+        // Build request with merged headers
+        let response = self
             .client
-            .post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .post(url)
             .header("Content-Type", "application/json")
-            .json(&request);
-
-        // Add custom headers if provided
-        if let Some(headers) = &options.headers {
-            for (key, value) in headers {
-                request_builder = request_builder.header(key, value);
-            }
-        }
-
-        let response = request_builder.send().await?;
+            .headers(merge_headers_reqwest(
+                (self.config.headers)(),
+                options.headers.as_ref(),
+            ))
+            .json(&request)
+            .send()
+            .await?;
 
         let status = response.status();
         if !status.is_success() {

@@ -6,7 +6,9 @@ use ai_sdk_provider::*;
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let api_key = std::env::var("OPENAI_API_KEY")
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-    let model = openai("gpt-4", api_key);
+
+    let provider = OpenAIProvider::builder().with_api_key(api_key).build();
+    let model = provider.language_model("gpt-4").unwrap();
 
     let options = CallOptions {
         prompt: vec![

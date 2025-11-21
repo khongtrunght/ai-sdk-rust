@@ -1,5 +1,4 @@
-use crate::common::TestServer;
-use ai_sdk_openai::*;
+use crate::common::{create_test_model, TestServer};
 use ai_sdk_provider::json_value::{JsonObject, JsonValue};
 use ai_sdk_provider::language_model::{Message, UserContentPart};
 use ai_sdk_provider::*;
@@ -38,8 +37,7 @@ async fn test_convert_max_output_tokens_to_max_completion_tokens() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("o4-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "o4-mini");
 
     let _ = model
         .do_generate(CallOptions {
@@ -104,8 +102,7 @@ async fn test_flex_processing_for_o4_mini() {
     );
     provider_options.insert("openai".to_string(), openai_options);
 
-    let model = OpenAIChatModel::new("o4-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "o4-mini");
 
     let _ = model
         .do_generate(CallOptions {
@@ -153,8 +150,7 @@ async fn test_developer_messages_for_o1() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("o1", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "o1");
 
     let _ = model
         .do_generate(CallOptions {
@@ -223,8 +219,7 @@ async fn test_reasoning_tokens_in_metadata() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("o4-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "o4-mini");
 
     let response = model
         .do_generate(CallOptions {

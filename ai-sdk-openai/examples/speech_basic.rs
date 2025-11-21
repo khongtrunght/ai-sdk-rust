@@ -1,5 +1,5 @@
-use ai_sdk_openai::OpenAISpeechModel;
-use ai_sdk_provider::{AudioData, SpeechGenerateOptions, SpeechModel};
+use ai_sdk_openai::OpenAIProvider;
+use ai_sdk_provider::{AudioData, ProviderV3, SpeechGenerateOptions};
 use std::fs::File;
 use std::io::Write;
 
@@ -9,7 +9,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let api_key = std::env::var("OPENAI_API_KEY")?;
 
     // Create the speech model
-    let model = OpenAISpeechModel::new("tts-1", api_key);
+    let provider = OpenAIProvider::builder().with_api_key(api_key).build();
+    let model = provider.speech_model("tts-1").unwrap();
 
     println!("Generating speech from text...");
 

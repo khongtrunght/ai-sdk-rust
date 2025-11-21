@@ -1,7 +1,7 @@
 mod common;
 
-use ai_sdk_openai::OpenAIEmbeddingModel;
-use ai_sdk_provider::{EmbedOptions, EmbeddingModel};
+use ai_sdk_openai::OpenAIProvider;
+use ai_sdk_provider::{EmbedOptions, EmbeddingModel, ProviderV3};
 use common::TestServer;
 use serde_json::json;
 
@@ -29,7 +29,10 @@ fn create_embedding_response(embeddings: &[&[f32]], usage: (u32, u32)) -> serde_
 
 #[tokio::test]
 async fn test_embedding_model_trait() {
-    let model = OpenAIEmbeddingModel::new("text-embedding-3-small", "test-key");
+    let provider = OpenAIProvider::builder().with_api_key("test-key").build();
+    let model = provider
+        .text_embedding_model("text-embedding-3-small")
+        .unwrap();
 
     assert_eq!(model.provider(), "openai");
     assert_eq!(model.model_id(), "text-embedding-3-small");
@@ -39,7 +42,7 @@ async fn test_embedding_model_trait() {
 
 #[tokio::test]
 async fn test_too_many_embeddings() {
-    let model = OpenAIEmbeddingModel::new("text-embedding-3-small", "test-key");
+    let model = make_test_embedding_model("");
 
     // Create more than 2048 values
     let values: Vec<String> = (0..2049).map(|i| format!("text {}", i)).collect();
@@ -68,9 +71,7 @@ async fn test_openai_embedding_extract_embedding() {
         .mock_json_response("/v1/embeddings", response)
         .await;
 
-    // Create model pointing to mock server
-    let model = OpenAIEmbeddingModel::new("text-embedding-3-small", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = make_test_embedding_model(&test_server.base_url);
 
     let options = EmbedOptions {
         values: vec![
@@ -102,8 +103,7 @@ async fn test_openai_embedding_extract_usage() {
         .mock_json_response("/v1/embeddings", response)
         .await;
 
-    let model = OpenAIEmbeddingModel::new("text-embedding-3-small", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = make_test_embedding_model(&test_server.base_url);
 
     let options = EmbedOptions {
         values: vec!["Hello world".into(), "Test embedding".into()],
@@ -136,9 +136,6 @@ async fn test_openai_embedding_pass_dimensions() {
         .mock_json_response("/v1/embeddings", response)
         .await;
 
-    let model = OpenAIEmbeddingModel::new("text-embedding-3-small", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
-
     // Create provider options with dimensions
     let mut openai_opts = HashMap::new();
     openai_opts.insert(
@@ -154,6 +151,8 @@ async fn test_openai_embedding_pass_dimensions() {
         provider_options: Some(provider_options),
         headers: None,
     };
+
+    let model = make_test_embedding_model(&test_server.base_url);
 
     let result = model.do_embed(options).await.unwrap();
 
@@ -179,8 +178,7 @@ async fn test_openai_embedding_pass_model_and_values() {
         .mock_json_response("/v1/embeddings", response)
         .await;
 
-    let model = OpenAIEmbeddingModel::new("text-embedding-3-large", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = make_test_embedding_model(&test_server.base_url);
 
     let test_values = vec![
         "sunny day at the beach".into(),
@@ -203,4 +201,17 @@ async fn test_openai_embedding_pass_model_and_values() {
     assert_eq!(request_body["model"], "text-embedding-3-large");
     assert_eq!(request_body["input"], json!(test_values));
     assert_eq!(request_body["encoding_format"], "float");
+}
+
+fn make_test_embedding_model(base_url: &str) -> std::sync::Arc<dyn EmbeddingModel<String>> {
+    let mut builder = OpenAIProvider::builder().with_api_key("test-key");
+
+    if !base_url.is_empty() {
+        builder = builder.with_base_url(format!("{}/v1", base_url));
+    }
+
+    let provider = builder.build();
+    provider
+        .text_embedding_model("text-embedding-3-large")
+        .expect("Failed to create embedding model")
 }

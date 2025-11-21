@@ -1,5 +1,4 @@
-use crate::common::TestServer;
-use ai_sdk_openai::*;
+use crate::common::{create_test_model, TestServer};
 use ai_sdk_provider::json_value::{JsonObject, JsonValue};
 use ai_sdk_provider::language_model::{FunctionTool, Message, Tool, ToolChoice, UserContentPart};
 use ai_sdk_provider::*;
@@ -37,8 +36,7 @@ async fn test_pass_model_and_messages() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-3.5-turbo", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-3.5-turbo");
 
     let _ = model
         .do_generate(CallOptions {
@@ -107,8 +105,7 @@ async fn test_pass_settings() {
 
     provider_options.insert("openai".to_string(), openai_options);
 
-    let model = OpenAIChatModel::new("gpt-3.5-turbo", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-3.5-turbo");
 
     let _ = model
         .do_generate(CallOptions {
@@ -161,8 +158,7 @@ async fn test_pass_reasoning_effort_from_provider_metadata() {
     );
     provider_options.insert("openai".to_string(), openai_options);
 
-    let model = OpenAIChatModel::new("o4-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "o4-mini");
 
     let _ = model
         .do_generate(CallOptions {
@@ -215,8 +211,7 @@ async fn test_pass_reasoning_effort_from_settings() {
     );
     provider_options.insert("openai".to_string(), openai_options);
 
-    let model = OpenAIChatModel::new("o4-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "o4-mini");
 
     let _ = model
         .do_generate(CallOptions {
@@ -268,9 +263,8 @@ async fn test_pass_text_verbosity_setting() {
         JsonValue::String("low".to_string()),
     );
     provider_options.insert("openai".to_string(), openai_options);
-
-    let model = OpenAIChatModel::new("gpt-4o", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    // Create model pointing to mock server
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let _ = model
         .do_generate(CallOptions {
@@ -315,8 +309,7 @@ async fn test_pass_tools_and_tool_choice() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-3.5-turbo", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-3.5-turbo");
 
     let tool = Tool::Function(FunctionTool {
         name: "test-tool".to_string(),
@@ -379,8 +372,7 @@ async fn test_pass_headers() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-3.5-turbo", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-3.5-turbo");
 
     let mut headers = HashMap::new();
     headers.insert(
@@ -439,8 +431,7 @@ async fn test_parse_tool_results() {
         .mock_json_response("/v1/chat/completions", response_json)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-3.5-turbo", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-3.5-turbo");
 
     let tool = Tool::Function(FunctionTool {
         name: "test-tool".to_string(),

@@ -1,7 +1,7 @@
-use crate::common::{load_chunks_fixture, load_json_fixture, TestServer};
-use ai_sdk_openai::OpenAIChatModel;
+use crate::common::{create_test_model, load_chunks_fixture, load_json_fixture, TestServer};
+use ai_sdk_openai::OpenAIProvider;
 use ai_sdk_provider::language_model::{FunctionTool, Message, Tool, ToolChoice, UserContentPart};
-use ai_sdk_provider::{CallOptions, Content, FinishReason, LanguageModel, StreamPart};
+use ai_sdk_provider::{CallOptions, Content, FinishReason, ProviderV3, StreamPart};
 use futures::stream::StreamExt;
 
 #[tokio::test]
@@ -18,8 +18,7 @@ async fn test_tool_calling_non_streaming_with_fixture() {
         .await;
 
     // Create model pointing to mock server
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let tool = Tool::Function(FunctionTool {
         name: "get_weather".to_string(),
@@ -106,8 +105,7 @@ async fn test_tool_calling_streaming_with_fixture() {
         .await;
 
     // Create model pointing to mock server
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let tool = Tool::Function(FunctionTool {
         name: "calculate".to_string(),
@@ -198,8 +196,7 @@ async fn test_multiple_tools_with_fixture() {
         .await;
 
     // Create model pointing to mock server
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let weather_tool = Tool::Function(FunctionTool {
         name: "get_weather".to_string(),
@@ -295,8 +292,11 @@ async fn test_no_tool_calls_when_not_needed_with_fixture() {
         .await;
 
     // Create model pointing to mock server
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let provider = OpenAIProvider::builder()
+        .with_api_key("test-key")
+        .with_base_url(format!("{}/v1", test_server.base_url))
+        .build();
+    let model = provider.language_model("gpt-4").unwrap();
 
     let tool = Tool::Function(FunctionTool {
         name: "get_weather".to_string(),

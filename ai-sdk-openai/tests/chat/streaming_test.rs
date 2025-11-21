@@ -1,5 +1,4 @@
-use crate::common::{load_chunks_fixture, TestServer};
-use ai_sdk_openai::*;
+use crate::common::{create_test_model, load_chunks_fixture, TestServer};
 use ai_sdk_provider::json_value::{JsonObject, JsonValue};
 use ai_sdk_provider::language_model::{FunctionTool, Message, Tool, UserContentPart};
 use ai_sdk_provider::*;
@@ -20,8 +19,7 @@ async fn test_stream_text_delta() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -70,8 +68,7 @@ async fn test_stream_tool_deltas() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let tool = Tool::Function(FunctionTool {
         name: "get_weather".to_string(),
@@ -123,8 +120,7 @@ async fn test_stream_usage_information() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -168,8 +164,7 @@ async fn test_stream_finish_reason() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -227,8 +222,7 @@ async fn test_stream_with_custom_headers() {
         .mount(&test_server.server)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let mut headers = HashMap::new();
     headers.insert("custom-header".to_string(), "custom-value".to_string());
@@ -274,8 +268,7 @@ async fn test_stream_with_provider_options() {
     );
     provider_options.insert("openai".to_string(), openai_options);
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -310,8 +303,7 @@ async fn test_stream_multiple_tool_calls() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let tools = vec![
         Tool::Function(FunctionTool {
@@ -373,8 +365,7 @@ async fn test_stream_cached_tokens() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -419,8 +410,7 @@ async fn test_stream_reasoning_tokens() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("o4-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "o4-mini");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -458,8 +448,7 @@ async fn test_stream_with_temperature() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -496,8 +485,7 @@ async fn test_stream_with_max_tokens() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -532,8 +520,7 @@ async fn test_stream_annotations() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4o-search-preview", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4o-search-preview");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -571,8 +558,7 @@ async fn test_stream_empty_response() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -617,8 +603,7 @@ async fn test_stream_service_tier_flex() {
     );
     provider_options.insert("openai".to_string(), openai_options);
 
-    let model = OpenAIChatModel::new("o4-mini", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "o4-mini");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -664,8 +649,7 @@ async fn test_stream_logit_bias() {
     openai_options.insert("logitBias".to_string(), JsonValue::Object(logit_bias));
     provider_options.insert("openai".to_string(), openai_options);
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -699,8 +683,7 @@ async fn test_stream_stop_sequences() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -734,8 +717,7 @@ async fn test_stream_presence_penalty() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -770,8 +752,7 @@ async fn test_stream_seed() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {
@@ -805,8 +786,7 @@ async fn test_stream_response_metadata() {
         .mock_streaming_response("/v1/chat/completions", chunks)
         .await;
 
-    let model = OpenAIChatModel::new("gpt-4", "test-key")
-        .with_base_url(format!("{}/v1", test_server.base_url));
+    let model = create_test_model(&test_server.base_url, "gpt-4");
 
     let options = CallOptions {
         prompt: vec![Message::User {

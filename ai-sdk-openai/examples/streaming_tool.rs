@@ -4,7 +4,7 @@
 //! such as an image generation tool that reports progress.
 
 use ai_sdk_core::{generate_text, Tool, ToolContext, ToolError, ToolOutput};
-use ai_sdk_openai::OpenAIChatModel;
+use ai_sdk_openai::{OpenAIChatModel, OpenAIConfig};
 use ai_sdk_provider::JsonValue;
 use async_trait::async_trait;
 use serde_json::json;
@@ -111,7 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "OPENAI_API_KEY environment variable not set")?;
 
     // Create model
-    let model = OpenAIChatModel::new("gpt-4", api_key);
+    let model = OpenAIChatModel::new("gpt-4", OpenAIConfig::from_api_key(api_key));
 
     // Create tools
     let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(ImageGenerationTool)];

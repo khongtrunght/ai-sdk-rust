@@ -1,11 +1,15 @@
-use ai_sdk_openai::OpenAIEmbeddingModel;
-use ai_sdk_provider::{EmbedOptions, EmbeddingModel};
+use ai_sdk_openai::OpenAIProvider;
+use ai_sdk_provider::{EmbedOptions, ProviderV3};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let api_key = std::env::var("OPENAI_API_KEY")
         .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
-    let model = OpenAIEmbeddingModel::new("text-embedding-3-small", api_key);
+
+    let provider = OpenAIProvider::builder().with_api_key(api_key).build();
+    let model = provider
+        .text_embedding_model("text-embedding-3-small")
+        .unwrap();
 
     let options = EmbedOptions {
         values: vec![

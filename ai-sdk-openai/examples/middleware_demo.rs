@@ -14,7 +14,7 @@
 use ai_sdk_core::middleware::{
     wrap_language_model, DefaultSettingsMiddleware, SimulateStreamingMiddleware,
 };
-use ai_sdk_openai::OpenAIChatModel;
+use ai_sdk_openai::{OpenAIChatModel, OpenAIConfig};
 use ai_sdk_provider::language_model::{CallOptions, Message, UserContentPart};
 use futures::StreamExt;
 use std::env;
@@ -29,7 +29,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 1: DefaultSettingsMiddleware
     println!("1. Using DefaultSettingsMiddleware to set default temperature");
     {
-        let base_model = Box::new(OpenAIChatModel::new("gpt-4o-mini", api_key.clone()));
+        let base_model = Box::new(OpenAIChatModel::new(
+            "gpt-4o-mini",
+            OpenAIConfig::from_api_key(api_key.clone()),
+        ));
 
         // Wrap with middleware that sets default temperature
         let wrapped_model = wrap_language_model(
@@ -60,7 +63,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 2: SimulateStreamingMiddleware
     println!("2. Using SimulateStreamingMiddleware to convert generate to stream");
     {
-        let base_model = Box::new(OpenAIChatModel::new("gpt-4o-mini", api_key.clone()));
+        let base_model = Box::new(OpenAIChatModel::new(
+            "gpt-4o-mini",
+            OpenAIConfig::from_api_key(api_key.clone()),
+        ));
 
         // Wrap with simulate streaming middleware
         let wrapped_model =
@@ -98,7 +104,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 3: Composing multiple middlewares
     println!("3. Composing DefaultSettings + SimulateStreaming");
     {
-        let base_model = Box::new(OpenAIChatModel::new("gpt-4o-mini", api_key.clone()));
+        let base_model = Box::new(OpenAIChatModel::new(
+            "gpt-4o-mini",
+            OpenAIConfig::from_api_key(api_key.clone()),
+        ));
 
         // Compose multiple middlewares
         // First middleware (DefaultSettings) transforms params first
@@ -149,7 +158,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 4: Override defaults
     println!("4. Overriding default settings");
     {
-        let base_model = Box::new(OpenAIChatModel::new("gpt-4o-mini", api_key));
+        let base_model = Box::new(OpenAIChatModel::new(
+            "gpt-4o-mini",
+            OpenAIConfig::from_api_key(api_key),
+        ));
 
         let wrapped_model = wrap_language_model(
             base_model,

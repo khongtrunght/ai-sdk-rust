@@ -10,7 +10,7 @@
 //! ```
 
 use ai_sdk_core::generate_object::{generate_object, ObjectOutputStrategy};
-use ai_sdk_openai::OpenAIChatModel;
+use ai_sdk_openai::{OpenAIChatModel, OpenAIConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable must be set");
 
     // Create the model
-    let model = OpenAIChatModel::new("gpt-4o-mini", api_key);
+    let model = OpenAIChatModel::new("gpt-4o-mini", OpenAIConfig::from_api_key(api_key));
 
     // Define the JSON schema for the output
     let schema = serde_json::json!({

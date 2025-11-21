@@ -23,25 +23,6 @@ pub fn is_reasoning_model(model_id: &str) -> bool {
     model_id.starts_with("o1") || model_id.starts_with("o3") || model_id.starts_with("o4")
 }
 
-/// Check if model is specifically an o1 model
-///
-/// O1 models require system messages to be converted to developer messages.
-///
-/// # Examples
-///
-/// ```
-/// use ai_sdk_openai::model_detection::is_o1_model;
-///
-/// assert!(is_o1_model("o1"));
-/// assert!(is_o1_model("o1-preview"));
-/// assert!(is_o1_model("o1-mini"));
-/// assert!(!is_o1_model("o3-mini"));
-/// assert!(!is_o1_model("o4-mini"));
-/// ```
-pub fn is_o1_model(model_id: &str) -> bool {
-    model_id == "o1" || model_id.starts_with("o1-")
-}
-
 /// Check if model is a search preview model
 ///
 /// Search preview models do not support the `temperature` parameter.
@@ -78,7 +59,9 @@ pub fn is_search_preview_model(model_id: &str) -> bool {
 /// assert!(!supports_flex_processing("gpt-4o-mini"));
 /// ```
 pub fn supports_flex_processing(model_id: &str) -> bool {
-    model_id.starts_with("o3") || model_id.starts_with("o4") || model_id.starts_with("gpt-5")
+    model_id.starts_with("o3")
+        || model_id.starts_with("o4")
+        || (model_id.starts_with("gpt-5") && !model_id.starts_with("gpt-5-chat"))
 }
 
 #[cfg(test)]
@@ -106,21 +89,6 @@ mod tests {
         assert!(!is_reasoning_model("gpt-4o-mini"));
         assert!(!is_reasoning_model("gpt-3.5-turbo"));
         assert!(!is_reasoning_model("gpt-5"));
-    }
-
-    #[test]
-    fn test_is_o1_model() {
-        // O1 models
-        assert!(is_o1_model("o1"));
-        assert!(is_o1_model("o1-preview"));
-        assert!(is_o1_model("o1-mini"));
-        assert!(is_o1_model("o1-2024-12-17"));
-
-        // Not O1 models
-        assert!(!is_o1_model("o3"));
-        assert!(!is_o1_model("o3-mini"));
-        assert!(!is_o1_model("o4-mini"));
-        assert!(!is_o1_model("gpt-4o"));
     }
 
     #[test]

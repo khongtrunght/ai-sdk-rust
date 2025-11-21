@@ -7,10 +7,9 @@
 /// ```
 /// OPENAI_API_KEY=your-key-here cargo run --example multimodal_chat
 /// ```
-use ai_sdk_openai::OpenAIChatModel;
-use ai_sdk_provider::language_model::{
-    CallOptions, FileData, LanguageModel, Message, UserContentPart,
-};
+use ai_sdk_openai::OpenAIProvider;
+use ai_sdk_provider::language_model::{CallOptions, FileData, Message, UserContentPart};
+use ai_sdk_provider::ProviderV3;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -19,7 +18,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY environment variable must be set");
 
     // Create a vision-capable model
-    let model = OpenAIChatModel::new("gpt-4o", api_key);
+    let provider = OpenAIProvider::new(api_key);
+    let model = provider.language_model("gpt-4o").unwrap();
 
     println!("=== Multi-Modal Chat Example ===\n");
 
