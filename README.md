@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Documentation
 
 - [API Documentation](https://docs.rs/ai-sdk-provider)
-- [Examples](./ai-sdk-openai/examples/)
+- [Examples](./crates/ai-sdk-openai/examples/)
 - [Contributing Guide](./CONTRIBUTING.md)
 
 ## Model Support

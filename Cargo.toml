@@ -1,9 +1,9 @@
 [workspace]
 members = [
-  "ai-sdk-provider",
-  "ai-sdk-openai",
-  "ai-sdk-core",
-  "ai-sdk-provider-utils",
+  "crates/ai-sdk-provider",
+  "crates/ai-sdk-openai",
+  "crates/ai-sdk-core",
+  "crates/ai-sdk-provider-utils",
 ]
 resolver = "2"
 
@@ -15,10 +15,10 @@ repository = "https://github.com/khongtrunght/ai-sdk-rust"
 rust-version = "1.70"
 
 [workspace.dependencies]
-ai-sdk-provider = { version = "0.2.0", path = "ai-sdk-provider" }
-ai-sdk-core = { version = "0.2.0", path = "ai-sdk-core" }
-ai-sdk-openai = { version = "0.2.0", path = "ai-sdk-openai" }
-ai-sdk-provider-utils = { version = "0.1.0", path = "ai-sdk-provider-utils" }
+ai-sdk-provider = { version = "0.2.0", path = "crates/ai-sdk-provider" }
+ai-sdk-core = { version = "0.2.0", path = "crates/ai-sdk-core" }
+ai-sdk-openai = { version = "0.2.0", path = "crates/ai-sdk-openai" }
+ai-sdk-provider-utils = { version = "0.2.0", path = "crates/ai-sdk-provider-utils" }
 tokio = { version = "1.40", features = ["full"] }
 tokio-stream = "0.1"
 async-stream = "0.3"
